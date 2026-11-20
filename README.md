@@ -408,6 +408,7 @@ Frontend conventions used throughout the call screens:
 |---|---|
 | [`docs/EXP_Simplified_Implementation_Phases_Final_No_Approvals_4_Roles.md`](docs/EXP_Simplified_Implementation_Phases_Final_No_Approvals_4_Roles.md) | The six-phase delivery roadmap and the call-detail specification |
 | [`docs/EXP_Simplified_Call_Transfer_Blueprint_Final_No_Approvals_4_Roles.docx`](docs/EXP_Simplified_Call_Transfer_Blueprint_Final_No_Approvals_4_Roles.docx) | The original call-transfer blueprint (Word) the roadmap implements |
+| [`docs/supervised/README.md`](docs/supervised/README.md) | Production systemd units and setup for the AMI listener, scheduler and queue worker |
 | [`docs/EXP_Production_Deployment_Guide.md`](docs/EXP_Production_Deployment_Guide.md) | Step-by-step production updates: backup, pull main, build, migrate, seed, restart, verify and recover |
 | [`docs/EXP_Remaining_Implementation.md`](docs/EXP_Remaining_Implementation.md) | Current phase audit, operating hours and roster rules, IVR backfill procedure, rollout checklist |
 | [`docs/EXP_Call_Journey_Rollout_Steps.md`](docs/EXP_Call_Journey_Rollout_Steps.md) | Short pointer to the current rollout and acceptance steps |

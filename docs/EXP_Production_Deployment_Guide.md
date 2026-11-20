@@ -233,7 +233,7 @@ systemctl status exp-ami-listener.service --no-pager
 
 The PHP command behind that service is `php artisan exp:ami-listen`. There must be one listener per deployment, with the correct working directory, enabled PBX connection and writable lock path. Restarting it creates a short capture gap; verify its heartbeat and subsequent events. Do not delete a lock file to force a second listener to start.
 
-At the server inspection on 20 November 2026, no EXP listener service/process was found, and the production database had no saved PBX connection or AMI events. The AMI host and credentials were present in environment configuration. If that is still the state, configure and supervise EXP’s listener as a separate setup task; deployment alone will not begin call capture. Do not restart the existing `gwosevo-*` services as substitutes: those belong to another application.
+On 20 November 2026 the targeted supervision repair created and enabled `VitalPBX EXP`, started the EXP AMI listener and database queue worker, and enabled a scheduler timer. Use [the saved systemd configurations and instructions](supervised/README.md) for the installed service names. Verify the current heartbeat and service state before each deployment. Do not restart the existing `gwosevo-*` services as substitutes: those belong to another application.
 
 Check and gracefully reload Apache:
 
@@ -283,7 +283,7 @@ If a required check fails, keep or return EXP to maintenance mode, diagnose the 
 php artisan schedule:list
 ```
 
-This lists registered tasks; it does not prove that the scheduler is invoked. Confirm the server’s cron or equivalent timer runs it for this application. A typical cron entry, installed once for `www-data`, is:
+This lists registered tasks; it does not prove that the scheduler is invoked. Confirm the server’s cron or equivalent timer runs it for this application. Production now uses `exp-scheduler.timer` for this invocation. Check it with `systemctl list-timers exp-scheduler.timer --all --no-pager`; do not also install cron. If deliberately replacing the timer with cron, disable the timer first. A cron alternative, installed once for `www-data`, is:
 
 ```cron
 * * * * * cd /var/www/exp-operations && /usr/bin/php artisan schedule:run >> /var/www/exp-operations/storage/logs/scheduler.log 2>&1
