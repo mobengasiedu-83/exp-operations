@@ -13,20 +13,37 @@ EXP follows a call from the VitalPBX inbound leg, through the agent’s consent 
 ## Contents
 
 1. [What the application does](#what-the-application-does)
-2. [The call journey](#the-call-journey)
-3. [Tech stack](#tech-stack)
-4. [Requirements](#requirements)
-5. [Getting started](#getting-started)
-6. [Configuration reference](#configuration-reference)
-7. [Screens and modules](#screens-and-modules)
-8. [Roles and permissions](#roles-and-permissions)
-9. [PBX telemetry, commands and scheduler](#pbx-telemetry-commands-and-scheduler)
-10. [Testing and quality checks](#testing-and-quality-checks)
-11. [Project structure](#project-structure)
-12. [Documentation](#documentation)
-13. [Operational notes and open gates](#operational-notes-and-open-gates)
+2. [Default credentials](#default-credentials)
+3. [The call journey](#the-call-journey)
+4. [Tech stack](#tech-stack)
+5. [Requirements](#requirements)
+6. [Getting started](#getting-started)
+7. [Configuration reference](#configuration-reference)
+8. [Screens and modules](#screens-and-modules)
+9. [Roles and permissions](#roles-and-permissions)
+10. [PBX telemetry, commands and scheduler](#pbx-telemetry-commands-and-scheduler)
+11. [Testing and quality checks](#testing-and-quality-checks)
+12. [Project structure](#project-structure)
+13. [Documentation](#documentation)
+14. [Operational notes and open gates](#operational-notes-and-open-gates)
 
 ---
+
+## Default credentials
+
+`php artisan db:seed` writes the first super administrator into the database (`SuperAdministratorSeeder`); the credentials are not read from `.env`, and only a hash of the password is stored.
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Super Administrator | `admin@exp-operations.local` | `ExpConsole#2026` |
+
+- The account is seeded `active` and email-verified, because the console sits behind `EnsureUserIsActive` and the `verified` middleware. It holds the `Super Administrator` role, which passes every gate through `Gate::before`.
+- Re-running `php artisan db:seed --force`, or `php artisan db:seed --class=SuperAdministratorSeeder --force`, restores that password without duplicating the account — the recovery path when the password is unknown. It never re-activates an account an operator has deactivated.
+- Rotate the password after the first login and edit the constants in `database/seeders/SuperAdministratorSeeder.php`; otherwise the next seed restores the published one.
+- No other users are seeded. Accounts created in **Administration → Users** must verify their email address before they can sign in.
+
+---
+
 
 ## What the application does
 
@@ -137,14 +154,13 @@ php artisan db:seed --force
 - the dentist directory and approved numbers (`DentistDirectorySeeder`)
 - the report catalogue (`ReportCatalogueSeeder`)
 - role manuals and the read-only **Viewer** role (`GuideAccessSeeder`)
+- the super administrator login (`SuperAdministratorSeeder`)
 - workspace, transfer, follow-up, knowledge-bank, QA/training and guide permissions
 - standard service hours (Mon–Fri, 10:00–14:00), settings and live-alert rules
 
-The seeded `admin@exp-operations.local` account is created **without a usable password** (`Str::random(64)`). Set a known password during provisioning, for example:
+The seeded administrator is `active` and email-verified, so it can sign in immediately; the credentials are listed under [Default credentials](#default-credentials).
 
-```bash
-php artisan tinker --execute '$u = App\Models\User::where("email", "admin@exp-operations.local")->firstOrFail(); $u->password = Hash::make("choose-a-strong-password"); $u->save();'
-```
+Re-running `php artisan db:seed --force` against an existing database is the supported way to publish updated reference data: rows are matched by key/name so nothing is duplicated, an operator-disabled report definition stays disabled, and the permission cache is cleared at the end so no extra `permission:cache-reset` is needed. It does **not** touch user-generated data (cases, calls, callbacks, other users), but it does republish the role matrix from code and the seeded administrator's password, so permission changes made through the admin UI are reverted to the definition above.
 
 On later deployments, re-run only the narrow seeders you need, e.g.
 `php artisan db:seed --class=GuideAccessSeeder --force --no-interaction`.

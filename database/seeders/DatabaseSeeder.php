@@ -5,10 +5,8 @@ namespace Database\Seeders;
 use App\Models\AlertRule;
 use App\Models\ServiceHour;
 use App\Models\Setting;
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -259,15 +257,19 @@ class DatabaseSeeder extends Seeder
             AlertRule::firstOrCreate(['key' => $rule['key']], $rule + ['enabled' => true]);
         }
 
-        // Create default admin user
-        $admin = User::firstOrCreate(['email' => 'admin@exp-operations.local'], [
-            'name' => 'Administrator',
-            'password' => Str::random(64),
-            'active' => true,
-        ]);
-        if ($admin->wasRecentlyCreated) {
-            $admin->forceFill(['email_verified_at' => now()])->save();
-        }
-        $admin->assignRole('Super Administrator');
+        // Publish the super administrator from the seeder's own credentials so
+        // the login lives in the database, not in deployment configuration.
+        $this->call(SuperAdministratorSeeder::class);
+
+        // Re-seeding publishes authority from code, so drop the cached matrix
+        // instead of leaving a live environment answering from stale roles.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->command?->info(sprintf(
+            'Published %d permissions and %d roles; super administrator: %s.',
+            Permission::query()->count(),
+            Role::query()->count(),
+            SuperAdministratorSeeder::EMAIL,
+        ));
     }
 }
