@@ -32,7 +32,7 @@ function create() {
 }
 function save() {
     if (selected.value !== null) {
-        form.put(endpoints.update.url(String(selected.value)), {
+        form.put(endpoints.update.url(selected.value), {
             onSuccess: () => {
                 visible.value = false;
                 form.reset();

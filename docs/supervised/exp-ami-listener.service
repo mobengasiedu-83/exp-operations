@@ -1,0 +1,28 @@
+[Unit]
+Description=EXP Operations read-only VitalPBX AMI listener
+Wants=network-online.target
+After=network-online.target mariadb.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/exp-operations
+ExecStart=/usr/bin/php8.3 /var/www/exp-operations/artisan exp:ami-listen --no-interaction
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGTERM
+TimeoutStopSec=90s
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=exp-ami-listener
+
+[Install]
+WantedBy=multi-user.target

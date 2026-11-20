@@ -1,0 +1,20 @@
+[Unit]
+Description=EXP Operations scheduled tasks
+Wants=network-online.target
+After=network-online.target mariadb.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/exp-operations
+ExecStart=/usr/bin/php8.3 /var/www/exp-operations/artisan schedule:run --no-interaction
+TimeoutStartSec=300s
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=exp-scheduler
