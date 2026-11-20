@@ -29,22 +29,6 @@ EXP follows a call from the VitalPBX inbound leg, through the agent’s consent 
 
 ---
 
-## Default credentials
-
-`php artisan db:seed` writes the first super administrator into the database (`SuperAdministratorSeeder`); the credentials are not read from `.env`, and only a hash of the password is stored.
-
-| Role | Email | Password |
-| --- | --- | --- |
-| Super Administrator | `admin@exp-operations.local` | `ExpConsole#2026` |
-
-- The account is seeded `active` and email-verified, because the console sits behind `EnsureUserIsActive` and the `verified` middleware. It holds the `Super Administrator` role, which passes every gate through `Gate::before`.
-- Re-running `php artisan db:seed --force`, or `php artisan db:seed --class=SuperAdministratorSeeder --force`, restores that password without duplicating the account — the recovery path when the password is unknown. It never re-activates an account an operator has deactivated.
-- Rotate the password after the first login and edit the constants in `database/seeders/SuperAdministratorSeeder.php`; otherwise the next seed restores the published one.
-- No other users are seeded. Accounts created in **Administration → Users** must verify their email address before they can sign in.
-
----
-
-
 ## What the application does
 
 | Area | What it covers |
@@ -60,6 +44,19 @@ EXP follows a call from the VitalPBX inbound leg, through the agent’s consent 
 | **Reports** | Ten code-owned report definitions (daily/weekly/monthly operations, transfer quality, callback follow-up, QA, dentist engagement, safety, short calls, executive summary) with saved run snapshots and audited CSV export. |
 | **Administration** | Users, roles, permission catalogue, active sessions, service hours and settings, PBX connections, AMI health, integration and structured logs, CDR/CEL evidence and the audit log. |
 | **Guides** | The Agent, Viewer and Super Administrator manuals rendered in-app, each gated by its own permission. |
+
+## Default credentials
+
+`php artisan db:seed` writes the first super administrator into the database (`SuperAdministratorSeeder`); the credentials are not read from `.env`, and only a hash of the password is stored.
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Super Administrator | `admin@exp-operations.local` | `ExpConsole#2026` |
+
+- The account is seeded `active` and email-verified, because the console sits behind `EnsureUserIsActive` and the `verified` middleware. It holds the `Super Administrator` role, which passes every gate through `Gate::before`.
+- Re-running `php artisan db:seed --force`, or `php artisan db:seed --class=SuperAdministratorSeeder --force`, restores that password without duplicating the account — the recovery path when the password is unknown. It never re-activates an account an operator has deactivated.
+- Rotate the password after the first login and edit the constants in `database/seeders/SuperAdministratorSeeder.php`; otherwise the next seed restores the published one.
+- No other users are seeded. Accounts created in **Administration → Users** must verify their email address before they can sign in.
 
 ## The call journey
 
@@ -317,7 +314,7 @@ The seeders publish **46 base permissions plus three guide permissions**, and th
 | QA Reviewer | Audit, reports, QA reviews and approvals, training, incidents |
 | Executive / Management | Read-only reporting, including `view executive reports` and `export reports` |
 
-There is **no self-registration**: Fortify is configured with password reset, email verification, two-factor authentication and passkeys only. Accounts are created by an administrator, and inactive users are stopped by the `EnsureUserIsActive` middleware.
+There is **no self-registration**: Fortify is configured with password reset, email verification, two-factor authentication and passkeys only. Accounts are created by an administrator, and inactive users are stopped by the `EnsureUserIsActive` middleware. The one exception is the seeded super administrator described under [Default credentials](#default-credentials).
 
 ## PBX telemetry, commands and scheduler
 
