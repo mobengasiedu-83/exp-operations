@@ -159,3 +159,19 @@ test('all three role manuals ship complete with the application', function () {
         ->and($superAdminHtml)->toContain('id="27-quick-reference-card"')
         ->and($superAdminHtml)->not->toContain('## Contents');
 });
+
+test('a manual publishes its document facts and section links separately from the body', function () {
+    $document = app(GuideLibrary::class)->document(GuideLibrary::AGENT);
+
+    expect($document['facts'])->toHaveCount(4)
+        ->and($document['facts'][0])->toBe([
+            'label' => 'Audience',
+            'value' => 'Call-centre agents (role: <strong>Agent</strong>) working the EXP dental line',
+        ])
+        ->and($document['facts'][3]['label'])->toBe('Document version')
+        ->and($document['sections'])->toBe(25)
+        ->and($document['html'])->toContain('<h2 id="1-about-this-manual">')
+        ->and($document['html'])->toContain('class="guide-anchor"')
+        ->and($document['html'])->toContain('<table class="guide-table">')
+        ->and($document['html'])->not->toContain('<strong>Audience:</strong>');
+});
