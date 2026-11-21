@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\SetupPassword;
+use App\Notifications\VerifyUserEmail;
+use App\Notifications\WelcomeUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Response;
@@ -58,8 +62,12 @@ class UserController extends Controller
             $user->syncRoles($validated['roles']);
         }
 
+        $user->notify((new WelcomeUser)->afterCommit());
+        $user->notify((new VerifyUserEmail)->afterCommit());
+        $user->notify((new SetupPassword(PasswordBroker::createToken($user)))->afterCommit());
+
         return redirect()->route('admin.users.index')
-            ->with('success', 'User created successfully.');
+            ->with('success', 'User created successfully. Welcome, verification, and password setup emails have been queued.');
     }
 
     /**

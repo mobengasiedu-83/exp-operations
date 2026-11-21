@@ -45,6 +45,20 @@ The installer uses the application’s existing `config:exp-pbx:set` command int
 
 The queue worker uses the configured connection and default queue. Production was configured with the `database` driver and `retry_after=90` seconds; the worker timeout is 60 seconds and systemd allows 90 seconds to stop. Review those values together if the queue configuration changes. Do not run this worker alongside another worker manager consuming the same intended EXP workload without deliberately planning that concurrency.
 
+### User onboarding email delivery
+
+Admin-created users receive three queued emails: welcome, email verification, and password setup. A running queue worker is required for delivery. If `exp-queue-worker.service` is stopped, user creation can succeed while the emails remain queued. The application also needs valid mail transport configuration.
+
+Run as root on production to enable the worker and check its status and recent logs:
+
+```bash
+systemctl enable --now exp-queue-worker.service
+systemctl status exp-queue-worker.service --no-pager
+journalctl -u exp-queue-worker.service --since '10 minutes ago' --no-pager
+```
+
+Verification and password setup links expire. Keep the worker running so messages are delivered promptly; users can request a new password reset link from the forgot password page or resend verification after signing in if a link has expired.
+
 The scheduler service is a one-shot process. It normally shows `inactive` between timer runs; the timer should remain `active`, and completed runs should have `Result=success` and `ExecMainStatus=0`. Do not add a cron `schedule:run` entry while using this timer. The installer rejects a matching existing cron entry; also check for other custom timers or scheduler processes.
 
 ## Restart after a deployment
