@@ -6,6 +6,7 @@ use App\Models\IvrStep;
 use App\Models\PbxConnection;
 use App\Models\User;
 use App\Services\CallJourneyTimeline;
+use App\Services\IvrJourney;
 use App\Services\PbxTelemetry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -83,6 +84,25 @@ test('agent calls list only the calls that reached the agent', function () {
             ->where('calls.data.0.id', $fixtures['agent']->id)
             ->where('calls.data.0.basis', 'ivr')
             ->where('agentOption', '3'));
+});
+
+test('option two is a self-service product recording without an agent case', function () {
+    $fixtures = ivrCallFixtures();
+    $interaction = $fixtures['selfServe'];
+    $interaction->ivrSteps()->update(['option' => '2']);
+    $interaction->load('ivrSteps');
+    $journey = app(IvrJourney::class);
+
+    expect($journey->selections($interaction)[0])
+        ->toMatchArray([
+            'option' => '2',
+            'label' => 'Option 2 · Listen to Pepsodent reach, products and availability information',
+            'kind' => 'recording',
+        ])
+        ->and($journey->outcome($interaction, []))->toBe('Recorded message option · caller did not request an agent')
+        ->and($journey->selectedAgentOption($interaction))->toBeFalse()
+        ->and(Interaction::agentSelected()->whereKey($interaction->id)->exists())->toBeFalse()
+        ->and($interaction->callerCase)->toBeNull();
 });
 
 test('vitalpbx dtmf presses are captured once and agent dials are ignored', function () {

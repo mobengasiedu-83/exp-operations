@@ -256,7 +256,7 @@ Use Agent calls to answer: *"How many callers did we actually screen today, and 
 
 **Route:** `/calls/did`
 
-This screen lists **every call that arrived on the assigned DID**, including callers who chose a recorded message or the callback option and never spoke to anyone.
+This screen lists **every call that arrived on the assigned DID**, including callers who chose the oral health message or Pepsodent product information recording and never spoke to anyone.
 
 ### 9.1 The counters
 

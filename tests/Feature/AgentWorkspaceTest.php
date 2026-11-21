@@ -83,6 +83,22 @@ function workspaceAnswers(ScreeningProtocol $protocol, string $priority = 'P3', 
     ]];
 }
 
+test('workspace history encryption follows the request scheme without allowing response caching', function (string $scheme, bool $encrypted) {
+    $this->actingAs(workspaceUser());
+
+    $response = $this->get($scheme.'://localhost/workspace', [
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(request()),
+    ]);
+
+    $response->assertOk()->assertHeader('Cache-Control', 'no-store, private');
+    if ($encrypted) {
+        $response->assertJsonPath('encryptHistory', true);
+    } else {
+        $response->assertJsonMissingPath('encryptHistory');
+    }
+})->with([['http', false], ['https', true]]);
+
 test('workspace routes require authentication and case permissions', function () {
     $case = CallerCase::factory()->create();
     $this->get(route('workspace.index'))->assertRedirect(route('login'));

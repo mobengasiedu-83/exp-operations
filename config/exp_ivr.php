@@ -19,8 +19,8 @@ return [
     'agent_option' => (string) env('EXP_IVR_AGENT_OPTION', '3'),
 
     'options' => [
-        '1' => ['label' => 'Listen to the recorded dental health message', 'kind' => 'recording'],
-        '2' => ['label' => 'Request a callback from the EXP team', 'kind' => 'callback'],
+        '1' => ['label' => 'Listen to the oral health mission and brush day and night message', 'kind' => 'recording'],
+        '2' => ['label' => 'Listen to Pepsodent reach, products and availability information', 'kind' => 'recording'],
         '3' => ['label' => 'Speak to an EXP agent', 'kind' => 'agent'],
     ],
 

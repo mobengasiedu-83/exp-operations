@@ -68,7 +68,7 @@ Existing fixes capture DTMFEnd/Newexten/UserEvent selections in configured IVR c
 
 ## Live acceptance matrix
 
-For each scenario retain the PBX IDs and compare EXP detail to PBX evidence: option 1, callback option 2, option 3 with no answer, agent answer, failed dentist attempt followed by success, private briefing/transfer, caller hangup, dentist hangup and listener disconnect/reconnect. Confirm later repeated menu selections remain visible. Deliberately test an outage and import recovery. Keep unobserved timing null and retain outage warnings.
+For each scenario retain the PBX IDs and compare EXP detail to PBX evidence: option 1 oral health recording, option 2 Pepsodent product information recording, option 3 with no answer, agent answer, failed dentist attempt followed by success, private briefing/transfer, caller hangup, dentist hangup and listener disconnect/reconnect. Confirm later repeated menu selections remain visible. Deliberately test an outage and import recovery. Keep unobserved timing null and retain outage warnings.
 
 Verify read-only users cannot save answers, invoke call controls, change directories/settings or export without an explicit grant. Verify Viewer scope against the actual service-owner requirement before rollout. Confirm scheduler execution and supervised listener recovery on the deployment host, rather than assuming registration in `routes/console.php` proves the scheduler runs.
 

@@ -19,7 +19,7 @@ class ProtectCaseHistory
         if (! $request->is('cases', 'cases/*', 'workspace', 'transfers', 'transfers/*', 'callbacks', 'callbacks/*', 'referrals', 'referrals/*', 'knowledge-bank', 'knowledge-bank/*', 'quality-assurance', 'quality-assurance/*', 'training', 'training/*', 'incidents', 'incidents/*')) {
             return $next($request);
         }
-        Inertia::encryptHistory();
+        Inertia::encryptHistory($request->isSecure());
         $response = $next($request);
         $response->headers->set('Cache-Control', 'no-store, private');
 

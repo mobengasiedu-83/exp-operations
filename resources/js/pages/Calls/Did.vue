@@ -157,7 +157,7 @@ function toggle(id: number): void {
             <PageHero
                 eyebrow="Inbound · assigned DID"
                 title="Every call to the line"
-                description="Each call that reaches the assigned DID, with the menu the caller heard and the option they pressed — recorded message, callback or agent — and how the journey ended."
+                description="Each call that reaches the assigned DID, with the menu the caller heard and the option they pressed — oral health message, Pepsodent product information or agent — and how the journey ended."
                 accent="violet"
             >
                 <template #actions>

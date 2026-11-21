@@ -179,8 +179,8 @@ Every call to the EXP DID hears the same recorded menu:
 
 | Key | Option | What happens |
 |---|---|---|
-| **1** | Listen to the recorded dental health message | Self-service recording. No agent, no case. |
-| **2** | Request a callback from the EXP team | Self-service callback request. No agent contact on this call. |
+| **1** | Listen to the oral health mission and brush day and night message | Self-service recording. No agent, no case. |
+| **2** | Listen to Pepsodent reach, products and availability information | Self-service recording. No callback request, agent or case. |
 | **3** | Speak to an EXP agent | **This is your queue.** The call is routed to an agent for screening. |
 
 The agent option is configurable (`EXP_IVR_AGENT_OPTION`, default **3**). If it changes, the menu labels on **DID journeys** and **Agent calls** change with it — always read the label on screen instead of assuming.
@@ -722,7 +722,7 @@ Use it to answer: *"How many callers did we actually screen today, and how many 
 |---|---|
 | **Calls today** | Every arrival on the assigned DID. |
 | **Reached an agent** | Pressed the agent option or reached an agent leg. |
-| **Self-service** | No agent contact (recording or callback option). |
+| **Self-service** | No agent contact (oral health or Pepsodent information recording). |
 | **Live now** | Calls still in progress. |
 
 **Filters** — From / To, **Menu option** (any recorded option, listed with its label), **Reached an agent** (*Either*, *Agent contact*, *Self-service only*), **Caller number**.
@@ -948,7 +948,7 @@ When something goes wrong, give them this in one message:
 | **Disposition** | The recorded outcome of a case, e.g. urgent referral, callback requested, FAQ resolved. |
 | **Draft** | Autosaved but unconfirmed questionnaire answers. Never counts as a screening. |
 | **EXP** | The operations programme this console supports; "verified EXP" means the call is confirmed as an EXP journey. |
-| **IVR** | The recorded menu callers hear (1 recording, 2 callback, 3 agent). |
+| **IVR** | The recorded menu callers hear (1 oral health message, 2 Pepsodent product information, 3 agent). |
 | **Interaction** | One call journey in the PBX/CDR evidence (`Call #id`). |
 | **Jitsi** | The telephony console used to answer, hold, dial and hang up. Always the manual fallback. |
 | **Masked number** | A partially hidden phone number (e.g. `233*****34`) shown instead of the full value. |

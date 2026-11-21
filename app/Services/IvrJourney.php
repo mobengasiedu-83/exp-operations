@@ -196,7 +196,6 @@ class IvrJourney
 
         return match ($this->optionKind($last?->option)) {
             'recording' => 'Recorded message option · caller did not request an agent',
-            'callback' => 'Callback option · caller did not request an agent',
             'unknown' => $last === null ? 'IVR option not recorded for this call' : 'Self-service option recorded',
             default => 'Self-service · no agent contact',
         };
