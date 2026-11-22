@@ -694,6 +694,7 @@ test('questionnaire autosave stores incomplete answers with status author and ve
         'priority' => 'P2',
         'answers' => [
             ['question_id' => $protocol->questions[0]->id, 'answer' => 'no'],
+            ['question_id' => $protocol->questions[1]->id, 'answer' => ''],
         ],
     ])->assertOk()
         ->assertJsonPath('draft.screening_protocol_id', $protocol->id)

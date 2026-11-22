@@ -321,3 +321,42 @@ test('alerts page exposes counts, filters and configuration to viewers', functio
             ->where('filters.status', 'open')
             ->where('filters.severity', 'critical'));
 });
+
+test('old calls missing hangup evidence are excluded from live counts without fabricating completion', function () {
+    $this->freezeTime();
+    $connection = expLiveConnection();
+    $stale = Interaction::factory()->create([
+        'pbx_connection_id' => $connection->id,
+        'status' => 'active',
+        'started_at' => now()->subHours(6),
+        'ended_at' => null,
+    ]);
+    $snapshot = app(LiveOperationsSnapshot::class)->build();
+
+    expect($snapshot['kpis']['active'])->toBe(0)
+        ->and($snapshot['active_calls'])->toBeEmpty()
+        ->and($stale->fresh()->status)->toBe('active')
+        ->and($stale->fresh()->ended_at)->toBeNull();
+});
+
+test('long calls with recent PBX evidence remain in the live count', function () {
+    $this->freezeTime();
+    $connection = expLiveConnection();
+    $call = Interaction::factory()->create([
+        'pbx_connection_id' => $connection->id,
+        'status' => 'active',
+        'started_at' => now()->subHours(6),
+    ]);
+    $call->events()->create([
+        'pbx_connection_id' => $connection->id,
+        'event_name' => 'Newstate',
+        'occurred_at' => now()->subMinute(),
+        'fingerprint' => fake()->uuid(),
+        'timing_quality' => 'pbx',
+        'data' => [],
+    ]);
+
+    $snapshot = app(LiveOperationsSnapshot::class)->build();
+    expect($snapshot['kpis']['active'])->toBe(1)
+        ->and($snapshot['active_calls'][0]['id'])->toBe($call->id);
+});

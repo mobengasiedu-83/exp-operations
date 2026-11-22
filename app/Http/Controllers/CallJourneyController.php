@@ -94,7 +94,8 @@ class CallJourneyController extends Controller
             'timeline' => app(CallJourneyTimeline::class)->for($interaction),
 
             'interaction' => $interaction->loadMissing('legs')->makeHidden(['legs', 'callerCase', 'attempts'])
-                ->append(['caller_number', 'inbound_line', 'dentist_number']),
+                ->append(['caller_number', 'inbound_line', 'dentist_number'])->toArray()
+                + ['live_status' => $interaction->status === 'active' && ! Interaction::query()->whereKey($interaction->id)->recentlyActive()->exists() ? 'Unconfirmed — missing hangup evidence' : $interaction->status],
             'legs' => $interaction->legs()->orderBy('started_at')->orderBy('id')->paginate(50, ['*'], 'legs_page')->withQueryString(),
             'events' => $interaction->events()->orderBy('occurred_at')->orderBy('id')->paginate(50, ['*'], 'events_page')->withQueryString(),
             'bridges' => $interaction->bridges()->orderBy('started_at')->orderBy('id')->paginate(50, ['*'], 'bridges_page')->withQueryString(),

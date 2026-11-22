@@ -27,6 +27,20 @@ class Interaction extends Model
 
     protected $fillable = ['pbx_connection_id', 'correlation_key', 'correlation_aliases', 'is_exp', 'status', 'timing_quality', 'reconciliation_status', 'started_at', 'ended_at', 'reconciled_at'];
 
+    /**
+     * @param  Builder<Interaction>  $query
+     * @return Builder<Interaction>
+     */
+    public function scopeRecentlyActive(Builder $query): Builder
+    {
+        $cutoff = now()->subMinutes(120);
+
+        return $query->where('status', 'active')->where(function (Builder $query) use ($cutoff): void {
+            $query->where('started_at', '>=', $cutoff)
+                ->orWhereHas('events', fn (Builder $events) => $events->where('occurred_at', '>=', $cutoff));
+        });
+    }
+
     protected function casts(): array
     {
         return ['correlation_aliases' => 'array', 'is_exp' => 'boolean', 'started_at' => 'immutable_datetime', 'ended_at' => 'immutable_datetime', 'reconciled_at' => 'immutable_datetime'];
@@ -82,7 +96,7 @@ class Interaction extends Model
 
     /** Only explicit option-3 evidence qualifies a call for agent data entry.
      *
-     * @param Builder<static> $query
+     * @param  Builder<static>  $query
      */
     public function scopeAgentSelected(Builder $query): void
     {

@@ -133,7 +133,7 @@ class LiveOperationsSnapshot
             ->when($filters['agent'] ?? null, fn ($query, $agent) => $query->whereHas('legs', fn ($legs) => $legs->where('role', 'agent')->where('channel', 'like', '%'.$agent.'%')))
             ->when($filters['destination'] ?? null, fn ($query, $destination) => $query->whereHas('legs', fn ($legs) => $legs->where('role', 'mobile')->where('channel', 'like', '%'.$destination.'%')))
             ->when($filters['state'] ?? null, fn ($query, $state) => match ($state) {
-                'active' => $query->where('status', 'active'),
+                'active' => $query->recentlyActive(),
                 'completed' => $query->where('status', 'completed'),
                 'abandoned' => $query->where('status', 'completed')->whereDoesntHave('legs', fn ($legs) => $legs->where('role', 'agent')->whereNotNull('answered_at')),
                 default => $query,
@@ -150,7 +150,7 @@ class LiveOperationsSnapshot
             'inbound' => (clone $scope)->count(),
             'answered' => (clone $scope)->whereHas('legs', fn ($legs) => $legs->where('role', 'agent')->whereNotNull('answered_at'))->count(),
             'abandoned' => (clone $scope)->where('status', 'completed')->whereDoesntHave('legs', fn ($legs) => $legs->where('role', 'agent')->whereNotNull('answered_at'))->count(),
-            'active' => (clone $scope)->where('status', 'active')->count(),
+            'active' => (clone $scope)->recentlyActive()->count(),
             'completed' => (clone $scope)->where('status', 'completed')->count(),
             'dentist_ringing' => (clone $scope)->whereHas('legs', fn ($legs) => $legs->where('role', 'mobile')->whereNotNull('ringing_at')->whereNull('answered_at')->whereNull('ended_at'))->count(),
             'consultations_active' => (clone $scope)->whereHas('bridges', fn ($bridges) => $bridges->where('stage', 'consultation')->whereNull('ended_at'))->count(),
@@ -170,7 +170,7 @@ class LiveOperationsSnapshot
      */
     private function activeCalls(Builder $scope): array
     {
-        $calls = (clone $scope)->where('status', 'active')
+        $calls = (clone $scope)->recentlyActive()
             ->with(['legs', 'bridges'])
             ->withCount('exceptions')
             ->orderByDesc('started_at')->orderByDesc('id')

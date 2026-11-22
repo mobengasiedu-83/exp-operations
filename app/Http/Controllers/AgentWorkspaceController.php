@@ -8,8 +8,8 @@ use App\Models\ScreeningDraft;
 use App\Models\ScreeningProtocol;
 use App\Models\User;
 use App\Services\AgentCallContext;
-use App\Services\CaseWorkflow;
 use App\Services\CallLifecycle;
+use App\Services\CaseWorkflow;
 use App\Services\DentistDirectory;
 use App\Services\Training;
 use Illuminate\Http\JsonResponse;
@@ -146,7 +146,7 @@ class AgentWorkspaceController extends Controller
             'answers' => ['required', 'array', 'list', 'max:100'],
             'answers.*' => ['required', 'array:question_id,answer'],
             'answers.*.question_id' => ['required', 'integer', 'distinct'],
-            'answers.*.answer' => ['present', 'string', 'max:2000'],
+            'answers.*.answer' => ['present', 'nullable', 'string', 'max:2000'],
         ]);
         $draft = $workflow->saveDraft($case, $this->user($request), $data);
 

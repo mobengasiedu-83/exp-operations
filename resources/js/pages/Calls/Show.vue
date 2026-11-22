@@ -87,6 +87,7 @@ type CaseRecord = {
 
 const props = defineProps<{
     interaction: {
+        live_status?: string;
         id: number;
         correlation_key: string;
         status: string;
@@ -574,7 +575,7 @@ function runReconciliation() {
                                 <span
                                     class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide uppercase ring-1"
                                     :class="stateTone(interaction.status)"
-                                    >{{ interaction.status }}</span
+                                    >{{ interaction.live_status ?? interaction.status }}</span
                                 >
                             </dd>
                         </div>
