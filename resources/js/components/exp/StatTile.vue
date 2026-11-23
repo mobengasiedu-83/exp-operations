@@ -103,7 +103,7 @@ watch(
 
 <template>
     <div
-        class="exp-rise group relative overflow-hidden rounded-2xl border p-4 shadow-sm ring-1 transition hover:-translate-y-0.5 hover:shadow-md"
+        class="operations-stat exp-rise group relative overflow-hidden rounded-2xl border p-4 shadow-sm ring-1 transition hover:-translate-y-0.5 hover:shadow-md"
         :class="[
             style.ring,
             `exp-rise-${delay}`,

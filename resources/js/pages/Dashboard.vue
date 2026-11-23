@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
+import { ArrowUpRight, AudioLines, Headphones, PhoneIncoming, Radio, Stethoscope } from '@lucide/vue';
+import OperationsArtwork from '@/components/exp/OperationsArtwork.vue';
+import StatTile from '@/components/exp/StatTile.vue';
 import { dashboard } from '@/routes';
 import { dashboard as expDashboard } from '@/routes/exp';
 import { activeCalls as liveActiveCalls } from '@/routes/live-operations';
@@ -50,43 +53,32 @@ const { snapshot, error, loading } = useLiveSnapshot(
 );
 
 const kpis = computed(() => [
-    { label: 'Inbound journeys', value: snapshot.value?.kpis.inbound ?? 0 },
-    { label: 'Answered by agent', value: snapshot.value?.kpis.answered ?? 0 },
-    { label: 'Dentist ringing', value: snapshot.value?.kpis.dentist_ringing ?? 0 },
-    { label: 'Active now', value: snapshot.value?.kpis.active ?? 0 },
+    { label: 'Inbound journeys', icon: PhoneIncoming, tone: 'emerald' as const, value: snapshot.value?.kpis.inbound ?? 0 },
+    { label: 'Answered by agent', icon: Headphones, tone: 'sky' as const, value: snapshot.value?.kpis.answered ?? 0 },
+    { label: 'Dentist ringing', icon: Stethoscope, tone: 'amber' as const, value: snapshot.value?.kpis.dentist_ringing ?? 0 },
+    { label: 'Active now', icon: AudioLines, tone: 'emerald' as const, value: snapshot.value?.kpis.active ?? 0 },
 ]);
 </script>
 
 <template>
-    <div class="min-h-full bg-slate-50 p-5 dark:bg-slate-950 sm:p-8">
+    <div class="operations-dashboard min-h-full p-4 sm:p-7 lg:p-9">
         <Head title="Dashboard" />
 
         <div class="mx-auto max-w-7xl space-y-7">
-            <header class="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                    <p
-                        class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700"
-                    >
-                        Pepsodent · Talk to a Dentist
-                    </p>
-                    <h1
-                        class="mt-2 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white"
-                    >
-                        Operations overview
-                    </h1>
-                    <p class="mt-2 text-sm text-slate-500">
-                        Live enquiry, private handover and consultation activity.
-                        Network answer does not confirm a human dentist accepted
-                        the call.
-                    </p>
+            <header class="operations-hero exp-rise relative isolate overflow-hidden rounded-[1.75rem] p-6 text-white sm:p-9 lg:p-11">
+                <div class="exp-grid absolute inset-0 -z-10 opacity-20" aria-hidden="true" />
+                <div class="relative z-10 max-w-xl lg:max-w-[62%]">
+                    <span class="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-[10px] font-semibold tracking-[.18em] text-teal-100 uppercase">
+                        <span class="size-1.5 rounded-full bg-teal-200" /> Pepsodent · Talk to a Dentist
+                    </span>
+                    <h1 class="mt-6 text-3xl leading-[1.08] font-semibold tracking-[-.045em] sm:text-4xl lg:text-5xl">Better connections.<br /><span class="text-teal-200">More reasons to smile.</span></h1>
+                    <p class="mt-4 max-w-md text-sm leading-7 text-teal-50/75">Your operations, together in one place. Follow every enquiry, support your agents, and connect callers with care.</p>
+                    <Link v-if="canViewLive" :href="expDashboard()" class="group mt-6 inline-flex items-center gap-4 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-teal-950 shadow-lg shadow-black/10 transition duration-300 hover:bg-teal-50 motion-safe:hover:-translate-y-0.5">
+                        Open live console <ArrowUpRight class="size-4 transition-transform motion-safe:group-hover:translate-x-0.5 motion-safe:group-hover:-translate-y-0.5" />
+                    </Link>
                 </div>
-                <Link
-                    v-if="canViewLive"
-                    :href="expDashboard()"
-                    class="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800"
-                >
-                    Open live console <span aria-hidden="true">→</span>
-                </Link>
+                <OperationsArtwork class="absolute top-1/2 right-5 hidden -translate-y-1/2 lg:block" />
+                <div class="relative z-10 mt-8 flex items-center gap-2 border-t border-white/15 pt-4 text-xs text-teal-100/70"><Radio class="size-3.5 shrink-0" /> Network answer does not confirm a human dentist accepted the call.</div>
             </header>
 
             <div
@@ -118,24 +110,12 @@ const kpis = computed(() => [
                     class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
                     aria-label="Live operations metrics"
                 >
-                <article
-                    v-for="kpi in kpis"
-                    :key="kpi.label"
-                    class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                >
-                    <p class="text-sm text-slate-500">{{ kpi.label }}</p>
-                    <p
-                        class="mt-3 text-3xl font-semibold text-slate-950 dark:text-white"
-                    >
-                        {{ loading && !snapshot ? '—' : kpi.value }}
-                    </p>
-                    <p class="mt-2 text-xs text-slate-400">Current window</p>
-                </article>
+                    <StatTile v-for="(kpi, index) in kpis" :key="kpi.label" :label="kpi.label" :value="loading && !snapshot ? '—' : kpi.value" :icon="kpi.icon" :tone="kpi.tone" :delay="(index + 1) as 1 | 2 | 3 | 4" hint="Current reporting window" />
             </section>
 
             <section class="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
                 <article
-                    class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                    class="operations-panel exp-rise exp-rise-3 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -268,9 +248,11 @@ const kpis = computed(() => [
                                 <tr v-if="(snapshot?.active_calls ?? []).length === 0">
                                     <td
                                         colspan="4"
-                                        class="px-5 py-10 text-center text-slate-500"
+                                        class="px-5 py-14 text-center text-slate-500"
                                     >
-                                        No active calls right now.
+                                        <div class="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-300"><Headphones class="size-6" :stroke-width="1.5" /></div>
+                                        <p class="font-medium text-slate-700 dark:text-slate-200">All quiet for now</p>
+                                        <p class="mt-1 text-xs">New active calls will appear here automatically.</p>
                                     </td>
                                 </tr>
                                 <tr v-if="loading && !snapshot">
