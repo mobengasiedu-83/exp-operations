@@ -159,6 +159,16 @@ test('live ingestion preserves route and mobile roles while redacting caller and
     expect(CallEvent::all()->toJson())->not->toContain('0241234567', 'private');
 });
 
+test('an inbound DID dialling an internal extension is not mistaken for a mobile destination', function () {
+    $connection = PbxConnection::create(['name' => 'PBX', 'host' => '127.0.0.1']);
+    correlateCallFrames($connection, [
+        ['t' => 0, 'Event' => 'Newchannel', 'Uniqueid' => 'caller', 'Linkedid' => 'caller', 'Channel' => 'PJSIP/trunk-1', 'Context' => 'exp-inbound', 'Exten' => '0596921095'],
+        ['t' => 1, 'Event' => 'DialBegin', 'Uniqueid' => 'caller', 'Linkedid' => 'caller', 'Channel' => 'PJSIP/trunk-1', 'Exten' => '0596921095', 'DestUniqueid' => 'agent-ring', 'DestChannel' => 'PJSIP/200-00000001'],
+    ]);
+
+    expect(CallLeg::where('uniqueid', 'agent-ring')->sole()->role)->not->toBe('mobile');
+});
+
 test('received timestamps are labelled and invalid PBX clocks produce diagnostics', function () {
     $connection = PbxConnection::create(['name' => 'PBX', 'host' => '127.0.0.1']);
     app(PbxTelemetry::class)->event($connection, ['Event' => 'Newchannel', 'Uniqueid' => 'one', 'Timestamp' => 'invalid']);

@@ -44,6 +44,8 @@ class DatabaseSeeder extends Seeder
             'view audit',
             // PBX
             'view pbx',
+            // Operations overview on the dashboard (read-only, every role)
+            'view operations overview',
             // Call history (simplified call list and full call detail)
             'view call history',
             'export call history',
@@ -54,6 +56,7 @@ class DatabaseSeeder extends Seeder
             'export reports',
             // Cases
             'view cases',
+            'create cases',
             'edit cases',
             'view all cases',
             'review cases',
@@ -100,7 +103,7 @@ class DatabaseSeeder extends Seeder
                 'view audit',
                 'view pbx',
                 'view reports',
-                'view cases', 'edit cases',
+                'view cases', 'create cases', 'edit cases',
                 'view dentists', 'edit dentists',
                 'view callbacks', 'view referrals',
                 'view knowledge bank', 'manage knowledge bank',
@@ -112,7 +115,7 @@ class DatabaseSeeder extends Seeder
                 'view users',
                 'view pbx',
                 'view cases',
-                'edit cases', 'view all cases', 'review cases',
+                'create cases', 'edit cases', 'view all cases', 'review cases',
                 'manage screening protocols',
                 'view audit',
                 'view dentists', 'edit dentists',
@@ -125,7 +128,7 @@ class DatabaseSeeder extends Seeder
             ],
             'Dental Assistant' => [
                 'view users',
-                'view cases', 'edit cases',
+                'view cases', 'create cases', 'edit cases',
                 'view dentists',
                 'view callbacks', 'edit callbacks', 'view referrals', 'edit referrals',
                 'view knowledge bank',
@@ -158,12 +161,12 @@ class DatabaseSeeder extends Seeder
             ],
             // Simplified console roles (Blueprint phase 1)
             'Agent' => [
-                'view cases', 'edit cases',
+                'view cases', 'create cases', 'edit cases',
                 'control calls', 'view call history',
                 'view dentists',
             ],
             'Supervisor' => [
-                'view cases', 'edit cases', 'view all cases', 'review cases',
+                'view cases', 'create cases', 'edit cases', 'view all cases', 'review cases',
                 'control calls', 'view call history', 'view reports',
                 'view dentists',
                 'view audit',
@@ -174,6 +177,15 @@ class DatabaseSeeder extends Seeder
         foreach ($roleDefinitions as $roleName => $rolePermissions) {
             $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
             $role->syncPermissions($rolePermissions);
+        }
+
+        // The Operations overview is the one operational screen every role may
+        // read: its KPIs, PBX health card and masked active-call list are the
+        // shared picture of the service. The live console itself, PBX
+        // administration and the Administration hub stay behind `view pbx`.
+        $operationsOverview = Permission::findOrCreate('view operations overview', 'web');
+        foreach (array_keys($roleDefinitions) as $roleName) {
+            Role::findOrCreate($roleName, 'web')->givePermissionTo($operationsOverview);
         }
 
         // Seed service hours

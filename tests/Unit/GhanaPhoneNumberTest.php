@@ -41,3 +41,10 @@ it('extracts the dialled number from Asterisk channel names', function () {
 it('matches mobile channels with hexadecimal Asterisk suffixes', function () {
     expect(GhanaPhoneNumber::fromChannel('PJSIP/trunk/0241234567-000000af'))->toBe('+233241234567');
 });
+
+it('reads the dialled number from a PJSIP dial string that names the trunk endpoint', function () {
+    expect(GhanaPhoneNumber::fromChannel('PJSIP/0241234567@196.201.48.139'))->toBe('+233241234567')
+        ->and(GhanaPhoneNumber::fromChannel('PJSIP/0531015150@196.201.48.139-00000826'))->toBe('+233531015150')
+        ->and(GhanaPhoneNumber::fromChannel('PJSIP/233241234567@196.201.48.139'))->toBe('+233241234567')
+        ->and(GhanaPhoneNumber::fromChannel('PJSIP/196.201.48.139-00000826'))->toBeNull();
+});

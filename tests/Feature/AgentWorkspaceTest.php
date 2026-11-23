@@ -175,6 +175,59 @@ test('a current live-call certification opens a case without the supervisor over
     expect(CallerCase::query()->sole()->assigned_to)->toBe($user->id);
 });
 
+test('agents with the create cases permission open a case and record details without a certification', function () {
+    $user = workspaceUser(['view cases', 'create cases', 'edit cases']);
+    $this->actingAs($user);
+    $interaction = Interaction::factory()->create(['is_exp' => true]);
+    workspaceOptionThree($interaction);
+    CallLeg::create(['interaction_id' => $interaction->id, 'pbx_connection_id' => $interaction->pbx_connection_id, 'uniqueid' => 'agent-open', 'role' => 'agent', 'channel' => 'PJSIP/204-00000003', 'observed_creation' => true]);
+
+    $this->get(route('workspace.index'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('canOpenCase', true));
+
+    $this->post(route('workspace.store'), ['interaction_id' => $interaction->id, 'association_confirmed' => true])->assertRedirect();
+    $case = CallerCase::query()->sole();
+    expect($case->assigned_to)->toBe($user->id);
+
+    workspaceChange($case, 'profile', workspaceProfile())->assertSessionHasNoErrors();
+    workspaceChange($case, 'note', ['body' => 'Agent recorded detail'])->assertSessionHasNoErrors();
+
+    expect($case->fresh()->callback_number)->toBe('+233241234567')
+        ->and($case->notes()->count())->toBe(1);
+});
+
+test('the seeded agent role opens a case from a recorded call', function () {
+    $this->seed();
+
+    $agent = User::factory()->create();
+    $agent->assignRole('Agent');
+    $this->actingAs($agent);
+
+    expect($agent->can('view cases'))->toBeTrue()
+        ->and($agent->can('create cases'))->toBeTrue()
+        ->and($agent->can('edit cases'))->toBeTrue();
+
+    $interaction = Interaction::factory()->create(['is_exp' => true]);
+    workspaceOptionThree($interaction);
+    CallLeg::create(['interaction_id' => $interaction->id, 'pbx_connection_id' => $interaction->pbx_connection_id, 'uniqueid' => 'agent-role-open', 'role' => 'agent', 'channel' => 'PJSIP/204-00000004', 'observed_creation' => true]);
+
+    $this->get(route('workspace.index'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Workspace/Index')
+            ->where('canEdit', true)
+            ->where('canOpenCase', true));
+
+    $this->post(route('workspace.store'), ['interaction_id' => $interaction->id, 'association_confirmed' => true])->assertRedirect();
+
+    $case = CallerCase::query()->sole();
+    expect($case->interaction_id)->toBe($interaction->id)
+        ->and($case->assigned_to)->toBe($agent->id)
+        ->and($case->association_verified_by)->toBe($agent->id);
+    $this->get(route('workspace.show', $case))->assertOk();
+});
+
 test('personal details and notes save without consent and are encrypted at rest', function () {
     $user = workspaceUser();
     $this->actingAs($user);

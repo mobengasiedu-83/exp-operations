@@ -69,8 +69,7 @@ class AmiEventNormalizer
                     $role = 'mobile';
                 }
             }
-            $number = $role === 'mobile' ? (GhanaPhoneNumber::normalize(is_string($extension) ? $extension : null)
-                ?? GhanaPhoneNumber::fromChannel($prefix === 'Dest' && is_string($frame['DialString'] ?? null) ? $frame['DialString'] : $channel)) : null;
+            $number = $role === 'mobile' ? $this->mobileNumber($frame, $prefix, $channel, $extension) : null;
             $caller = in_array($role, ['caller', 'unknown'], true)
                 ? $this->callerEvidence($frame[$prefix.'CallerIDNum'] ?? $frame[$prefix.'ConnectedLineNum'] ?? null)
                 : ['masked' => null, 'hash' => null];
@@ -252,6 +251,44 @@ class AmiEventNormalizer
             'masked' => GhanaPhoneNumber::mask($number) ?? GhanaPhoneNumber::maskReference($number),
             'hash' => GhanaPhoneNumber::fingerprint($number),
         ];
+    }
+
+    /**
+     * The dialled mobile number.
+     *
+     * PJSIP names the destination channel after the trunk endpoint
+     * (`PJSIP/196.201.48.139-00000826`), so the number is only present in the
+     * dial string (`PJSIP/0241234567@196.201.48.139`) or the outbound route's
+     * source extension. Without this every transfer destination is unparseable
+     * and the call is never counted against the dentist who was dialled.
+     *
+     * @param  array<string, mixed>  $frame
+     */
+    private function mobileNumber(array $frame, string $prefix, ?string $channel, mixed $extension): ?string
+    {
+        $candidates = is_string($extension) ? [$extension] : [];
+
+        if ($prefix === 'Dest') {
+            foreach (['DialString', 'Exten'] as $key) {
+                if (is_string($frame[$key] ?? null)) {
+                    $candidates[] = $frame[$key];
+                }
+            }
+        }
+
+        if ($channel !== null) {
+            $candidates[] = $channel;
+        }
+
+        foreach ($candidates as $candidate) {
+            $number = GhanaPhoneNumber::normalize($candidate) ?? GhanaPhoneNumber::fromChannel($candidate);
+
+            if ($number !== null) {
+                return $number;
+            }
+        }
+
+        return null;
     }
 
     private function isAgent(?string $channel): bool

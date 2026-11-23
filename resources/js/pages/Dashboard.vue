@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { ArrowUpRight, AudioLines, Headphones, PhoneIncoming, Radio, Stethoscope } from '@lucide/vue';
 import OperationsArtwork from '@/components/exp/OperationsArtwork.vue';
 import StatTile from '@/components/exp/StatTile.vue';
@@ -34,22 +34,22 @@ const refreshSeconds = ref(3);
 const paused = ref(false);
 
 /**
- * The live console is guarded by `view pbx`. A read-only role that lacks it
- * still lands on this dashboard, so the page reads the same permission
- * instead of firing requests it knows will be refused.
+ * The overview is rendered for every role (`view operations overview`), so the
+ * controller decides both flags: the overview data itself, and whether the
+ * deeper live console — still guarded by `view pbx` — can be opened.
  */
-const page = usePage();
-const canViewLive = computed<boolean>(() => {
-    const auth = page.props.auth as { permissions?: string[] } | undefined;
+const props = defineProps<{
+    canViewOverview: boolean;
+    canOpenConsole: boolean;
+}>();
 
-    return (auth?.permissions ?? []).includes('view pbx');
-});
+const overviewEnabled = computed<boolean>(() => props.canViewOverview);
 
 const { snapshot, error, loading } = useLiveSnapshot(
     filters,
     refreshSeconds,
     paused,
-    canViewLive,
+    overviewEnabled,
 );
 
 const kpis = computed(() => [
@@ -73,7 +73,7 @@ const kpis = computed(() => [
                     </span>
                     <h1 class="mt-6 text-3xl leading-[1.08] font-semibold tracking-[-.045em] sm:text-4xl lg:text-5xl">Better connections.<br /><span class="text-teal-200">More reasons to smile.</span></h1>
                     <p class="mt-4 max-w-md text-sm leading-7 text-teal-50/75">Your operations, together in one place. Follow every enquiry, support your agents, and connect callers with care.</p>
-                    <Link v-if="canViewLive" :href="expDashboard()" class="group mt-6 inline-flex items-center gap-4 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-teal-950 shadow-lg shadow-black/10 transition duration-300 hover:bg-teal-50 motion-safe:hover:-translate-y-0.5">
+                    <Link v-if="canOpenConsole" :href="expDashboard()" class="group mt-6 inline-flex items-center gap-4 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-teal-950 shadow-lg shadow-black/10 transition duration-300 hover:bg-teal-50 motion-safe:hover:-translate-y-0.5">
                         Open live console <ArrowUpRight class="size-4 transition-transform motion-safe:group-hover:translate-x-0.5 motion-safe:group-hover:-translate-y-0.5" />
                     </Link>
                 </div>
@@ -82,30 +82,31 @@ const kpis = computed(() => [
             </header>
 
             <div
-                v-if="!canViewLive"
+                v-if="!canViewOverview"
                 role="status"
                 class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
             >
-                You have read-only access. Live call activity is available to
-                operational roles only.
+                The operations overview is not enabled for this account yet.
+                Ask an administrator to grant the operations-overview
+                permission.
             </div>
 
             <div
-                v-if="canViewLive && error"
+                v-if="canViewOverview && error"
                 role="status"
                 class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
             >
                 {{ error }}
             </div>
             <div
-                v-if="canViewLive && snapshot?.connection?.last_error"
+                v-if="canViewOverview && snapshot?.connection?.last_error"
                 role="status"
                 class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
             >
                 AMI listener: {{ snapshot.connection.last_error }}
             </div>
 
-            <template v-if="canViewLive">
+            <template v-if="canViewOverview">
                 <section
                     class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
                     aria-label="Live operations metrics"
@@ -203,6 +204,7 @@ const kpis = computed(() => [
                             </p>
                         </div>
                         <Link
+                            v-if="canOpenConsole"
                             :href="liveActiveCalls()"
                             class="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
                             >View all</Link

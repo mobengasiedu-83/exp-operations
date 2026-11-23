@@ -97,10 +97,11 @@ application, plus the three guide permissions:
 | `view sessions`, `terminate sessions` | Review and end signed-in sessions |
 | `view audit` | Read the audit log |
 | `view pbx` | Live operations, PBX connections, AMI health, integration logs, connection health, structured logs, CDR/CEL |
+| `view operations overview` | Read the Operations overview on the Dashboard — KPIs, AMI health and the masked active-call list. Held by **every** role; it does not open the live console |
 | `view call history`, `export call history` | Read and export reconciled call history |
 | `control calls` | Use browser call controls on a case |
 | `view reports`, `view executive reports`, `export reports` | Run, read and export every report |
-| `view cases`, `edit cases`, `view all cases`, `review cases` | Read any case, document one, and run quality review |
+| `view cases`, `create cases`, `edit cases`, `view all cases`, `review cases` | Read any case, open a new one, document it, and run quality review |
 | `manage screening protocols` | Version and activate the questionnaire |
 | `view dentists`, `edit dentists` | Maintain the dentist directory, numbers, credentials and rosters |
 | `view/edit callbacks`, `view/edit referrals` | Oversee follow-up work |
@@ -204,7 +205,7 @@ rendered.
 
 | Menu | Route | What it is for |
 |---|---|---|
-| **Dashboard** | `/dashboard` | Post-login landing page and personal work list |
+| **Dashboard** | `/dashboard` | Post-login landing page carrying the Operations overview. Every role reads the overview; the live console link needs `view pbx` |
 | **Agent Workspace** | `/workspace` | Cases assigned to you; the agent's working screen |
 | **Calls** | `/live-operations/calls` | Agent calls, DID journeys, all calls and the reconciled history |
 | **Reports** | `/reports` | The operational report catalogue |
@@ -939,8 +940,10 @@ case before discussing the score.
 `view training`, `manage training`, `authorise live calls`)
 
 Training modules move `draft` → `published` → `retired`. Passing a module
-records a certification, and **opening a new live case requires a current live
-certification**. Without it the agent can still document existing cases, but the
+records a certification. Opening a new case is authorised by the `create cases`
+permission, which the Agent role holds; a current live certification also
+authorises it for operators who were granted one before the permission existed.
+Without either gate the agent can still document existing cases, but the
 *Open case* action is rejected.
 
 Your duties:
@@ -1287,7 +1290,7 @@ matching integration-log or structured-log entries.
 | **Callback** | A promised return call, with a due time and attempt history |
 | **CDR** | Call Detail Record; one row per call leg |
 | **CEL** | Channel Event Log; the PBX's channel-level event stream |
-| **Certification** | A recorded training pass; live certification gates opening live cases |
+| **Certification** | A recorded training pass; a current certification (or `create cases`) authorises opening cases |
 | **Correlation exception** | A call the console could not fully reconcile with the PBX |
 | **DID** | Direct Inward Dialling; the public number a caller dials |
 | **Disposition** | The recorded outcome of a case or call |

@@ -66,7 +66,7 @@ const props = defineProps<{
     filters: { status?: string; priority?: string; mine?: boolean };
     canEdit: boolean;
     canProtocols: boolean;
-    liveCallAuthorised: boolean;
+    canOpenCase: boolean;
 }>();
 const filters = reactive({
     status: props.filters.status ?? "",
@@ -173,12 +173,12 @@ const filterClass = "min-h-10 rounded-lg border bg-background px-3 py-2 text-sm"
             </div>
         </header>
         <p
-            v-if="canEdit && !liveCallAuthorised"
+            v-if="canEdit && !canOpenCase"
             role="alert"
             class="rounded-xl border border-amber-400 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100"
         >
-            You can update existing cases. Current live-call certification is required to open a new
-            case.
+            You can update existing cases. Opening a new case needs the create-cases permission —
+            ask your supervisor if the button below stays disabled.
         </p>
 
         <section v-if="canEdit" class="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -290,7 +290,7 @@ const filterClass = "min-h-10 rounded-lg border bg-background px-3 py-2 text-sm"
                                 ><button
                                     v-else
                                     type="button"
-                                    :disabled="!liveCallAuthorised || form.processing"
+                                    :disabled="!canOpenCase || form.processing"
                                     class="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border px-3 py-2 font-medium disabled:opacity-50"
                                     @click="selectCall(call)"
                                 >

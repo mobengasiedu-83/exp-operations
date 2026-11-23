@@ -22,8 +22,12 @@ test('one seed publishes every piece of reference data the console needs', funct
         ->and(ReportDefinition::query()->count())->toBe(count(Reporting::definitions()))
         ->and(Setting::query()->count())->toBeGreaterThanOrEqual(4)
         ->and(Role::findByName('Viewer', 'web')->hasPermissionTo('view viewer guides'))->toBeTrue()
+        ->and(Role::findByName('Agent', 'web')->hasPermissionTo('create cases'))->toBeTrue()
+        ->and(Role::findByName('Agent', 'web')->hasPermissionTo('view operations overview'))->toBeTrue()
+        ->and(Role::findByName('Dentist', 'web')->hasPermissionTo('view operations overview'))->toBeTrue()
+        ->and(Role::findByName('Viewer', 'web')->hasPermissionTo('view operations overview'))->toBeTrue()
         ->and(Role::findByName('Super Administrator', 'web')->hasPermissionTo('view super admin guides'))->toBeTrue()
-        ->and(Permission::query()->count())->toBeGreaterThanOrEqual(51);
+        ->and(Permission::query()->count())->toBeGreaterThanOrEqual(53);
 });
 
 test('re-seeding live never duplicates reference data or re-enables a retired role', function () {

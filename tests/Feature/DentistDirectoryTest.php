@@ -10,6 +10,8 @@ use App\Models\Interaction;
 use App\Models\PbxConnection;
 use App\Models\User;
 use App\Services\DentistDirectory;
+use App\Services\GhanaPhoneNumber;
+use App\Services\PbxTelemetry;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Inertia\Testing\AssertableInertia;
@@ -523,6 +525,43 @@ test('activity windows exclude future legs and match hexadecimal channels', func
         ->where('summary.unmatched', 0)->where('dentists.0.call_activity.attempts_24h', 1));
     $this->get(route('dentists.performance'))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('performance.summary.attempts', 1)->where('performance.summary.unmatched_attempts', 0));
+});
+
+test('transfers dialled through a trunk endpoint are attributed to the dentist', function () {
+    $this->freezeTime();
+    config(['services.exp_pbx.inbound_contexts' => ['exp-inbound']]);
+    $connection = expDentistConnection();
+    $dentist = Dentist::factory()->create();
+    DentistNumber::factory()->for($dentist)->primary()->create(['number' => '+233531015150']);
+
+    $telemetry = app(PbxTelemetry::class);
+    $telemetry->event($connection, [
+        'Event' => 'Newchannel', 'Uniqueid' => 'caller', 'Linkedid' => 'caller',
+        'Channel' => 'PJSIP/trunk-1', 'Context' => 'exp-inbound', 'CallerIDNum' => '0201234567',
+    ]);
+    // VitalPBX names the destination channel after the trunk host, so only the
+    // dial string identifies the dentist who was actually dialled.
+    $telemetry->event($connection, [
+        'Event' => 'DialBegin', 'Uniqueid' => 'caller', 'Linkedid' => 'caller',
+        'Channel' => 'PJSIP/200-00000001', 'Context' => 'trk-1-dial', 'Exten' => '0531015150',
+        'DestUniqueid' => 'mobile', 'DestChannel' => 'PJSIP/196.201.48.139-00000826',
+        'DestContext' => 'sub-set-crm-headers', 'DestExten' => 's',
+        'DialString' => 'PJSIP/0531015150@196.201.48.139',
+    ]);
+
+    $leg = CallLeg::where('uniqueid', 'mobile')->sole();
+    expect($leg->destination_masked)->toBe(GhanaPhoneNumber::mask('0531015150'))
+        ->and($leg->destination_hash)->toBe(GhanaPhoneNumber::fingerprint('0531015150'))
+        ->and(json_encode(CallLeg::all()->toArray()))->not->toContain('0531015150');
+
+    $this->actingAs(expDentistUser());
+
+    $this->get(route('dentists.index'))->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('summary.unmatched', 0)
+        ->where('dentists.0.call_activity.attempts_24h', 1));
+    $this->get(route('dentists.performance'))->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('performance.summary.attempts', 1)
+        ->where('performance.summary.unmatched_attempts', 0));
 });
 
 test('transfer selection exposes approved numbers and manual busy overrides', function () {

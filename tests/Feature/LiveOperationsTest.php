@@ -85,6 +85,56 @@ test('live operations routes require authentication and the PBX permission', fun
             ->has('filters.state'));
 });
 
+test('every role reads the operations overview without the PBX permission', function () {
+    expLiveConnection();
+
+    $agent = User::factory()->create();
+    $agent->givePermissionTo(Permission::findOrCreate('view operations overview'));
+
+    $this->withoutVite();
+
+    $this->actingAs($agent)->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dashboard')
+            ->where('canViewOverview', true)
+            ->where('canOpenConsole', false));
+
+    $this->getJson(route('exp.live'))
+        ->assertOk()
+        ->assertJsonPath('kpis.inbound', 0);
+
+    // The deeper console screens stay behind `view pbx`.
+    $this->get(route('exp.dashboard'))->assertForbidden();
+    $this->get(route('live-operations.active-calls'))->assertForbidden();
+    $this->get(route('live-operations.transfers'))->assertForbidden();
+    $this->get(route('live-operations.alerts'))->assertForbidden();
+});
+
+test('PBX operators keep the live console link on the dashboard overview', function () {
+    $this->withoutVite();
+
+    $this->actingAs(expLiveOperator())->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dashboard')
+            ->where('canViewOverview', true)
+            ->where('canOpenConsole', true));
+});
+
+test('the dashboard withholds the overview from an account without a role', function () {
+    $this->withoutVite();
+
+    $this->actingAs(User::factory()->create())->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dashboard')
+            ->where('canViewOverview', false)
+            ->where('canOpenConsole', false));
+
+    $this->getJson(route('exp.live'))->assertForbidden();
+});
+
 test('live snapshot reports freshness, masked channels and journey KPIs', function () {
     $connection = expLiveConnection();
     $active = Interaction::factory()->create([

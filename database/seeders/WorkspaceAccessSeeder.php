@@ -12,15 +12,15 @@ class WorkspaceAccessSeeder extends Seeder
     public function run(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
-        $permissions = ['view cases', 'edit cases', 'view all cases', 'review cases', 'manage screening protocols'];
+        $permissions = ['view cases', 'create cases', 'edit cases', 'view all cases', 'review cases', 'manage screening protocols'];
         foreach ($permissions as $permission) {
             Permission::findOrCreate($permission, 'web');
         }
         Role::findOrCreate('Super Administrator', 'web')->givePermissionTo($permissions);
         Role::findOrCreate('Lead Dentist / Clinical Supervisor', 'web')->givePermissionTo([
-            'view cases', 'edit cases', 'view all cases', 'review cases', 'manage screening protocols',
+            'view cases', 'create cases', 'edit cases', 'view all cases', 'review cases', 'manage screening protocols',
         ]);
-        Role::findOrCreate('Dental Assistant', 'web')->givePermissionTo(['view cases', 'edit cases']);
+        Role::findOrCreate('Dental Assistant', 'web')->givePermissionTo(['view cases', 'create cases', 'edit cases']);
         $this->call(ScreeningProtocolSeeder::class);
     }
 }

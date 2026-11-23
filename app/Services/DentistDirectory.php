@@ -131,6 +131,9 @@ class DentistDirectory
         $lookbackDays = max(1, (int) config('services.exp_pbx.dentist_unmatched_lookback_days', 7));
         $from = $at->subDays($lookbackDays)->startOfDay();
         $recent = $at->subDay();
+        // SQL bindings format timestamps without microseconds, so an inclusive
+        // bound of "now" would drop a leg dialled earlier in the current second.
+        $windowEnd = $at->addSecond();
 
         $numbers = DentistNumber::query()->contactable()->get(['number', 'dentist_id'])->keyBy(fn (DentistNumber $number): string => GhanaPhoneNumber::fingerprint($number->number) ?? '');
 
@@ -138,7 +141,7 @@ class DentistDirectory
             ->where('role', 'mobile')
             ->whereNotNull('dial_started_at')
             ->where('dial_started_at', '>=', $from)
-            ->where('dial_started_at', '<=', $at)
+            ->where('dial_started_at', '<', $windowEnd)
             ->orderByDesc('dial_started_at')
             ->limit(5000)
             ->get(['id', 'channel', 'destination_hash', 'destination_masked', 'dial_status', 'dial_started_at', 'ringing_at', 'answered_at', 'ended_at']);
@@ -209,6 +212,9 @@ class DentistDirectory
         $at = CarbonImmutable::now();
         $windowDays = max(1, min($days, 365));
         $from = $at->subDays($windowDays);
+        // Match the inclusive "now" of the activity window so a leg dialled
+        // earlier in the current second is not lost to microsecond truncation.
+        $windowEnd = $at->addSecond();
 
         $numbers = DentistNumber::query()->contactable()->get(['number', 'dentist_id'])->keyBy(fn (DentistNumber $number): string => GhanaPhoneNumber::fingerprint($number->number) ?? '');
         $dentists = Dentist::query()->orderBy('name')->get(['id', 'name', 'active']);
@@ -217,7 +223,7 @@ class DentistDirectory
             ->where('role', 'mobile')
             ->whereNotNull('dial_started_at')
             ->where('dial_started_at', '>=', $from)
-            ->where('dial_started_at', '<=', $at)
+            ->where('dial_started_at', '<', $windowEnd)
             ->orderByDesc('dial_started_at')
             ->limit(20000)
             ->get(['id', 'channel', 'destination_hash', 'destination_masked', 'dial_status', 'dial_started_at', 'ringing_at', 'answered_at', 'ended_at']);

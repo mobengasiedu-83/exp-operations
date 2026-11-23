@@ -162,6 +162,12 @@ Re-running `php artisan db:seed --force` against an existing database is the sup
 On later deployments, re-run only the narrow seeders you need, e.g.
 `php artisan db:seed --class=GuideAccessSeeder --force --no-interaction`.
 
+`php artisan migrate --force` alone is enough to unblock existing accounts when a
+permission is introduced later: the back-fill migrations grant newly added
+permissions (for example `create cases` and `view operations overview`) to the
+roles that already exist in the database, so an upgraded deployment does not need
+a reseed before agents can open cases.
+
 ### 4. Build the frontend
 
 ```bash
@@ -298,21 +304,23 @@ Feature flags are stored in the `settings` table (`app.feature_flags.ami_listene
 
 Authorisation is enforced twice: the sidebar (`App\Services\PrimaryNavigation`) only renders menus the user can open, and controller actions guard their work with `abort_unless($user->can(...), 403)` or `$this->authorize(...)` before touching data. Inertia shares the resolved permission list with the frontend so buttons can be hidden, but hiding is never the only check.
 
-The seeders publish **46 base permissions plus three guide permissions**, and these roles:
+The seeders publish **47 base permissions plus three guide permissions**, and these roles:
 
 | Role | Scope |
 |---|---|
 | **Super Administrator** | All base permissions, plus all three role manuals |
 | **Administrator** | All base permissions; agent and viewer manuals only (never the Super Administrator manual) |
-| **Agent** | `view cases`, `edit cases`, `control calls`, `view call history`, `view dentists` + agent guide |
+| **Agent** | `view cases`, `create cases`, `edit cases`, `control calls`, `view call history`, `view dentists` + agent guide |
 | **Supervisor** | Agent plus `view all cases`, `review cases`, `view reports`, `view audit` |
-| **Viewer** | Read-only: `view call history`, `view all cases`, `view reports`, `view dentists` + viewer guide. Deliberately **without** `view pbx`, which would also expose the live console and the administration hub |
+| **Viewer** | Read-only: `view call history`, `view all cases`, `view reports`, `view dentists`, `view operations overview` + viewer guide. Deliberately **without** `view pbx`, which would also expose the live console, the PBX telemetry tools and the administration hub |
 | Platform Manager | Day-to-day platform operations: users, settings, dentists, cases, knowledge bank, training, incidents |
 | Lead Dentist / Clinical Supervisor | Clinical governance: cases, protocols, dentist records, knowledge approval, QA approval, live-call authorisation |
 | Dental Assistant | Case support, callbacks, referrals, knowledge and training (read-only elsewhere) |
 | Dentist | `view cases`, `view dentists` |
 | QA Reviewer | Audit, reports, QA reviews and approvals, training, incidents |
 | Executive / Management | Read-only reporting, including `view executive reports` and `export reports` |
+
+Every role also receives `view operations overview`. That single read-only permission renders the Operations overview on the dashboard — KPI tiles, the VitalPBX AMI health card and the masked active-call list — for every signed-in role. It does not open the live console: `/exp`, the active-calls, transfers and alerts screens, the PBX telemetry tools and the Administration hub all still require `view pbx`.
 
 There is **no self-registration**: Fortify is configured with password reset, email verification, two-factor authentication and passkeys only. Accounts are created by an administrator, and inactive users are stopped by the `EnsureUserIsActive` middleware. The one exception is the seeded super administrator described under [Default credentials](#default-credentials).
 

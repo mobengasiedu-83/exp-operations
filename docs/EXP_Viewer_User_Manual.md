@@ -72,6 +72,7 @@ The **Viewer** role is deliberately narrow and entirely read-only. It normally c
 | `view all cases` | Read call records across the whole service, not only cases assigned to you. It grants no edit rights |
 | `view reports` | Open the published operational reports and compute their KPIs |
 | `view dentists` | Read the dentist directory, numbers, credentials, rosters, availability and performance |
+| `view operations overview` | Read the Operations overview on the Dashboard: KPI tiles, PBX health and the masked active-call list. It is read-only and does not open the live console |
 | `view viewer guides` | Open this guide |
 
 What that means in practice:
@@ -79,7 +80,7 @@ What that means in practice:
 - Your menu shows **Dashboard**, **Calls** (with three sub-pages), **Reports**, **Dentists** and **Guides**.
 - The sidebar footer, and the header icon on wide screens, hold the **Viewer guide** link. The **Agent guide** only appears for accounts that hold `view agent guides`; a Viewer normally does not.
 - You **never** see **Agent Workspace** or **Administration**. Typing `/workspace` or `/administration` directly returns **403 Forbidden**.
-- You cannot switch the live console on. Pages that need `view pbx` are closed to the Viewer role, and that permission is also one of the signals the console uses to decide whether to show the Administration hub.
+- You cannot switch the live console on. The Dashboard's Operations overview is open to every role through `view operations overview`, but every screen that needs `view pbx` — the live console, active calls, transfers, alerts and the PBX telemetry tools — is closed to the Viewer role. `view pbx` is also one of the signals the console uses to decide whether to show the Administration hub.
 - You do **not** receive the **Executive summary** report. It is marked sensitive and needs `view executive reports`.
 - **Exports are off by default.** Call-history CSV needs `export call history`; report CSV needs `export reports`. If your manager wants you to export, they must grant that permission explicitly.
 
@@ -183,17 +184,16 @@ Administrators maintain the window and its holiday exceptions. If the badge show
 
 ## 6. The Dashboard
 
-The Dashboard is a landing page, not a work queue. For a Viewer it shows:
+The Dashboard is a landing page, not a work queue. Every role sees the same **Operations overview** on it:
 
-- the **Pepsodent · Talk to a Dentist** identity and the "Operations overview" heading;
-- the statement that network answer does not confirm a human dentist accepted the call;
-- a read-only notice: *"You have read-only access. Live call activity is available to operational roles only."*
-
-That notice is expected. Live call activity is gated by `view pbx`, which the Viewer role does not hold. If your account has been granted `view pbx` for a temporary monitoring task, the Dashboard additionally shows:
-
+- the **Pepsodent · Talk to a Dentist** identity and the statement that network answer does not confirm a human dentist accepted the call;
 - **KPI tiles** — inbound journeys, answered by agent, dentist ringing, active now;
 - **VitalPBX AMI health** — last heartbeat, last PBX event, agent presence (inferred) and a freshness badge;
-- **Open live console** button, which opens the read-only live operations view.
+- the **active-call list**, with masked numbers, journey stage and duration.
+
+That overview is read-only and is granted to every role by `view operations overview`. It is the only live-operations permission a Viewer holds.
+
+The **Open live console** button and the **View all** link on the active-call list appear only when your account has `view pbx` for a temporary monitoring task; that permission opens the full live operations console, which the Viewer role normally does not hold.
 
 If you see a PBX error on that card, report it to your manager before drawing conclusions from any live number. Stored call history is unaffected and remains the record of truth.
 

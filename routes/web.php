@@ -20,6 +20,7 @@ use App\Http\Controllers\CallbackController;
 use App\Http\Controllers\CallControlController;
 use App\Http\Controllers\CallJourneyController;
 use App\Http\Controllers\CorrelationExceptionController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DentistController;
 use App\Http\Controllers\DidCallController;
 use App\Http\Controllers\ExpDashboardController;
@@ -39,7 +40,7 @@ use Illuminate\Support\Facades\Route;
 Route::inertia('/', 'Welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('administration', [AdministrationController::class, 'index'])->name('administration.index');
 
     // Operating manuals. Each role manual is gated by its own `view … guides`

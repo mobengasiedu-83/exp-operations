@@ -45,7 +45,7 @@ class AgentWorkspaceController extends Controller
             'filters' => $filters,
             'canEdit' => $user->can('edit cases'),
             'canProtocols' => $user->can('manage screening protocols'),
-            'liveCallAuthorised' => $training->isAuthorisedForLiveCalls($user),
+            'canOpenCase' => $this->canOpenCase($user, $training),
         ]);
     }
 
@@ -54,9 +54,9 @@ class AgentWorkspaceController extends Controller
         $this->authorize('view cases');
         $this->authorize('edit cases');
         abort_unless(
-            $training->isAuthorisedForLiveCalls($this->user($request)),
+            $this->canOpenCase($this->user($request), $training),
             403,
-            'An active live-call certification is required before opening a case.',
+            'Opening a case requires the create cases permission.',
         );
         $request->validate([
             'interaction_id' => ['required', 'integer', 'exists:interactions,id'],
@@ -223,6 +223,15 @@ class AgentWorkspaceController extends Controller
             'draft_saved_at' => $draft->draft_saved_at?->toIso8601String(),
             'answers' => $draft->answers,
         ];
+    }
+
+    /**
+     * Agents open cases with the `create cases` permission. A current live-call
+     * certification still authorises creation for operators who hold one.
+     */
+    private function canOpenCase(User $user, Training $training): bool
+    {
+        return $user->can('create cases') || $training->isAuthorisedForLiveCalls($user);
     }
 
     private function visible(Request $request, CallerCase $case): void

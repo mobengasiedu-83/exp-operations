@@ -70,6 +70,7 @@ The **Agent** role is deliberately narrow. It grants exactly these permissions:
 | Permission | What it lets you do |
 |---|---|
 | `view cases` | Open the Agent Workspace and read case records you are allowed to see |
+| `create cases` | Open a new case from a recorded agent call |
 | `edit cases` | Record consent, caller details, safety screens, notes and dispositions |
 | `control calls` | Use the browser **Call controls** panel on a case you own (when enabled) |
 | `view call history` | Open **Calls → Agent calls**, **DID journeys** and **All calls** |
@@ -81,7 +82,7 @@ What this means in practice:
 - Your menu shows **Dashboard**, **Agent Workspace**, **Calls** (with three sub-pages), **Dentists** and **Guides**.
 - You **cannot** open Administration, Reports, Callbacks, Referrals, Knowledge Bank, Quality Assurance, Training or Incidents unless your account is given extra permissions. If a colleague has one of those menus and you do not, that is normal.
 - You only see **cases assigned to you**. There is no shared queue of other agents' cases; `view all cases` is a supervisor permission, not an agent one. Opening a new case assigns it to you.
-- **Opening a new live case requires a current live-call certification.** Without one you can still read and document existing cases, but *Open case* will be rejected with a 403 message. Your supervisor manages certifications.
+- **Opening a new case needs the `create cases` permission**, which the Agent role holds. Without it you can still read and document existing cases you own, but *Add case details* will be rejected with a 403 message.
 
 > **If a menu or button is missing,** assume it is a permission setting, not a bug. Ask your supervisor or administrator — do not attempt workarounds.
 
@@ -146,7 +147,9 @@ The Dashboard is a health snapshot, not a work queue:
 - connection status and last error for the PBX connection;
 - today's call counters;
 - currently active calls table (caller, stage, duration);
-- a link into the live operations view for deeper detail.
+- a link into the live operations view for deeper detail — shown only when the
+  account also holds `view pbx`. The Agent role always reads the overview
+  itself through `view operations overview`.
 
 If the Dashboard shows a PBX error, tell your supervisor **before** the next call and continue answering in Jitsi.
 
@@ -267,7 +270,7 @@ A case is the record of one caller's contact. One call = one case. Do not open a
 
 - Call is active in Jitsi and you have spoken to the caller.
 - The interaction is verified as an EXP call and has observed agent-channel evidence.
-- You hold a current live-call certification.
+- You hold the `create cases` permission (the Agent role includes it).
 - You are certain which active call is the caller's.
 
 ### 8.2 Opening
@@ -289,7 +292,7 @@ A case is the record of one caller's contact. One call = one case. Do not open a
 
 | Message | Meaning | Action |
 |---|---|---|
-| *An active live-call certification is required before opening a case.* | Your certification expired or was never issued. | Read/document only, tell your supervisor. |
+| *Opening a case requires the create cases permission.* | Your account lacks `create cases`. | Read/document existing cases only, and ask your supervisor to grant it. |
 | *Verified EXP and observed Assistant channel evidence is required.* | The call is not verified as an EXP call, or the agent leg was never observed. | Re-check the call card; if it is a genuine call, escalate to your supervisor. |
 | *More than one call is active or the PBX evidence conflicts. Confirm the exact interaction before opening this case.* | Ambiguity flag without acknowledgement. | Identify the call positively, then tick ambiguity acknowledged. |
 | *404 — page not found* | The case is not assigned to you (or no longer exists). | Do not retry; ask your supervisor to check case assignment. |
@@ -876,7 +879,7 @@ When something goes wrong, give them this in one message:
 | **No calls appear in the workspace** | PBX telemetry stale/offline, or polling paused | Check the PBX badge and heartbeat, press **Refresh calls**, check Jitsi/switchboard, resume prompts, tell your supervisor if it persists. |
 | **"PBX stale/offline" warning** | AMI listener has not reported | Do not assume the queue is empty. Work from Jitsi; report it. |
 | **Call controls say "unavailable"** | Gateway not configured, case not open, or you are not the assigned agent | Continue in Jitsi; that is the documented fallback. |
-| **"An active live-call certification is required…"** | Certification missing or expired | Document existing cases only; ask your supervisor to renew it. |
+| **"Opening a case requires the create cases permission."** | Your account lacks `create cases` | Document existing cases only; ask your supervisor to grant it. |
 | **"This case changed. Reload it…"** | Another operator saved first | Reload the case, re-read current values, re-apply your change once. |
 | **"These answers were saved in another window…"** | Draft edited in two tabs | Click **Discard this window's unsaved answers and reload the case**. |
 | **Form fields are greyed out** | Consent not granted, or the case is closed | Record consent first; closed cases cannot be edited except withdrawal. |
@@ -907,7 +910,7 @@ When something goes wrong, give them this in one message:
 - [ ] Dashboard shows the PBX connection healthy (or the issue is already reported).
 - [ ] Service-window badge shows **Open · Mon–Fri 10:00–14:00** (or you know why it is closed).
 - [ ] Workspace open, live prompts running, active-call panel empty or understood.
-- [ ] Live-call certification current (otherwise you cannot open new cases).
+- [ ] `create cases` permission on your account (otherwise you cannot open new cases).
 
 ### During a call
 

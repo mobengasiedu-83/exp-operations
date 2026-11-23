@@ -97,7 +97,14 @@ class GhanaPhoneNumber
     }
 
     /**
-     * Extract and normalise a dialled number from an Asterisk channel name.
+     * Extract and normalise a dialled number from an Asterisk channel name or
+     * dial string.
+     *
+     * A PJSIP dial string names the endpoint after the number
+     * (`PJSIP/0241234567@196.201.48.139`), while the resulting channel is named
+     * after the endpoint alone (`PJSIP/196.201.48.139-00000826`). The number is
+     * therefore only readable from the dial string, and the endpoint must be
+     * dropped before normalising or every transferred call looks unparseable.
      */
     public static function fromChannel(?string $channel): ?string
     {
@@ -111,7 +118,23 @@ class GhanaPhoneNumber
         // Asterisk appends a unique suffix such as "-00000001" to the channel.
         $segment = preg_replace('/-[0-9a-f]{1,12}$/i', '', $segment) ?? $segment;
 
-        return self::normalize($segment);
+        // A dial string carries the endpoint/context after the dialled number.
+        $endpoint = strpos($segment, '@');
+        if ($endpoint !== false) {
+            $segment = substr($segment, 0, $endpoint);
+        }
+
+        $number = self::normalize($segment);
+
+        if ($number !== null) {
+            return $number;
+        }
+
+        // Fall back to any Ghana mobile token in the dial string so a channel
+        // decorated by the dialplan still resolves to its destination.
+        return preg_match('/(?:\+?233|0)[235][0-9]{8}/', $channel, $matches) === 1
+            ? self::normalize($matches[0])
+            : null;
     }
 
     /** Redact dialable numbers embedded in a channel, retaining short agent extensions. */

@@ -28,7 +28,12 @@ class GuideAccessSeeder extends Seeder
         $viewerGuide = Permission::findOrCreate('view viewer guides', 'web');
         $superAdminGuide = Permission::findOrCreate('view super admin guides', 'web');
 
-        $viewerPermissions = ['view call history', 'view all cases', 'view reports', 'view dentists'];
+        // `view operations overview` is the one live-operations permission the
+        // Viewer keeps: it renders the dashboard overview read-only. `view pbx`
+        // still stays away from the role because it also reveals the live
+        // console, PBX telemetry tools and the administration hub.
+        $viewerPermissions = ['view call history', 'view all cases', 'view reports', 'view dentists', 'view operations overview'];
+
         foreach ($viewerPermissions as $permission) {
             Permission::findOrCreate($permission, 'web');
         }

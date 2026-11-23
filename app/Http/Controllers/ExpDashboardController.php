@@ -34,7 +34,12 @@ class ExpDashboardController extends Controller
 
     public function live(Request $request, LiveOperationsSnapshot $snapshot, AlertEvaluator $evaluator): JsonResponse
     {
-        $this->authorize('view pbx');
+        // The Operations overview on the dashboard reads this endpoint, so every
+        // role that can see the overview may read the snapshot. Opening the
+        // console pages (/exp, active calls, transfers, alerts) still needs
+        // `view pbx`; the payload already masks phone numbers.
+        $user = $request->user();
+        abort_unless($user instanceof User && $user->canAny(['view pbx', 'view operations overview']), 403);
         $filters = $this->validatedFilters($request);
         $this->evaluateAlerts($evaluator);
 
