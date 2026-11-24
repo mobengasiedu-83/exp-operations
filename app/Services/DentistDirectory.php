@@ -2,13 +2,16 @@
 
 namespace App\Services;
 
+use App\Models\CallBridge;
 use App\Models\CallLeg;
 use App\Models\Dentist;
 use App\Models\DentistAvailability;
 use App\Models\DentistCredential;
 use App\Models\DentistNumber;
 use App\Models\DentistRoster;
+use App\Models\TransferAttempt;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 
 /**
  * Builds roster coverage, unmatched destinations and confirmed call activity.
@@ -144,7 +147,9 @@ class DentistDirectory
             ->where('dial_started_at', '<', $windowEnd)
             ->orderByDesc('dial_started_at')
             ->limit(5000)
-            ->get(['id', 'channel', 'destination_hash', 'destination_masked', 'dial_status', 'dial_started_at', 'ringing_at', 'answered_at', 'ended_at']);
+            ->get(['id', 'interaction_id', 'uniqueid', 'channel', 'destination_hash', 'destination_masked', 'dial_status', 'dial_started_at', 'ringing_at', 'answered_at', 'ended_at']);
+
+        $answered = $this->answeredLegIds($legs);
 
         /** @var array<int, array<string, mixed>> $byDentist */
         $byDentist = [];
@@ -166,7 +171,7 @@ class DentistDirectory
                 if ($leg->dial_started_at !== null && $leg->dial_started_at->gte($recent)) {
                     $entry['attempts_24h']++;
 
-                    if ($leg->answered_at !== null) {
+                    if (isset($answered[$leg->id])) {
                         $entry['answered_24h']++;
                     }
                 }
@@ -203,6 +208,79 @@ class DentistDirectory
     }
 
     /**
+     * Legs whose dentist call provably reached the network.
+     *
+     * The ANSWER frame can be missing from a projection (retention, an
+     * out-of-order frame filed against another journey, or a replay that no
+     * longer carries it). A leg therefore still counts as answered when the
+     * retained evidence proves the channel connected: an ANSWER dial status, a
+     * tracker attempt in an answered state, or membership of a private handover
+     * or consultation bridge. Attempts are never inflated by this check.
+     *
+     * @param  Collection<int, CallLeg>  $legs
+     * @return array<int, true>
+     */
+    private function answeredLegIds(Collection $legs): array
+    {
+        $answered = [];
+        $pending = [];
+
+        foreach ($legs as $leg) {
+            if ($leg->answered_at !== null || $leg->dial_status === 'ANSWER') {
+                $answered[$leg->id] = true;
+            } else {
+                $pending[$leg->id] = $leg;
+            }
+        }
+
+        if ($pending === []) {
+            return $answered;
+        }
+
+        foreach (array_chunk(array_keys($pending), 500) as $ids) {
+            $attempts = TransferAttempt::query()
+                ->whereIn('call_leg_id', $ids)
+                ->get(['call_leg_id', 'answered_at', 'status']);
+
+            foreach ($attempts as $attempt) {
+                if ($attempt->answered_at !== null || in_array($attempt->status, TransferAttempt::ANSWERED_STATUSES, true)) {
+                    $answered[$attempt->call_leg_id] = true;
+                }
+            }
+        }
+
+        $remaining = array_diff_key($pending, $answered);
+
+        if ($remaining === []) {
+            return $answered;
+        }
+
+        $interactionIds = collect($remaining)->pluck('interaction_id')->filter()->unique()->values()->all();
+        $bridged = [];
+
+        foreach (array_chunk($interactionIds, 500) as $ids) {
+            $bridges = CallBridge::query()
+                ->whereIn('interaction_id', $ids)
+                ->whereIn('stage', ['private_handover', 'consultation'])
+                ->get(['participants']);
+
+            foreach ($bridges as $bridge) {
+                foreach (is_array($bridge->participants) ? $bridge->participants : [] as $uniqueid) {
+                    $bridged[(string) $uniqueid] = true;
+                }
+            }
+        }
+
+        foreach ($remaining as $leg) {
+            if (isset($bridged[(string) $leg->uniqueid])) {
+                $answered[$leg->id] = true;
+            }
+        }
+
+        return $answered;
+    }
+
+    /**
      * Matching mobile-leg outcomes per dentist over a rolling window.
      *
      * @return array{window_days: int, as_of: string, rows: array<int, array<string, mixed>>, summary: array<string, mixed>}
@@ -226,7 +304,9 @@ class DentistDirectory
             ->where('dial_started_at', '<', $windowEnd)
             ->orderByDesc('dial_started_at')
             ->limit(20000)
-            ->get(['id', 'channel', 'destination_hash', 'destination_masked', 'dial_status', 'dial_started_at', 'ringing_at', 'answered_at', 'ended_at']);
+            ->get(['id', 'interaction_id', 'uniqueid', 'channel', 'destination_hash', 'destination_masked', 'dial_status', 'dial_started_at', 'ringing_at', 'answered_at', 'ended_at']);
+
+        $answeredLegs = $this->answeredLegIds($legs);
 
         /** @var array<int, array<string, mixed>> $stats */
         $stats = [];
@@ -257,10 +337,13 @@ class DentistDirectory
             $entry['attempts']++;
             $entry['last_attempt_at'] ??= $leg->dial_started_at?->toIso8601String();
 
-            if ($leg->answered_at !== null && $leg->dial_started_at !== null) {
+            if (isset($answeredLegs[$leg->id])) {
                 $entry['answered']++;
-                $entry['dial_to_answer_total'] += max(0, $leg->answered_at->getTimestamp() - $leg->dial_started_at->getTimestamp());
-                $entry['dial_to_answer_samples']++;
+
+                if ($leg->answered_at !== null) {
+                    $entry['dial_to_answer_total'] += max(0, $leg->answered_at->getTimestamp() - $leg->dial_started_at->getTimestamp());
+                    $entry['dial_to_answer_samples']++;
+                }
             } elseif ($leg->dial_status !== null && in_array($leg->dial_status, AlertEvaluator::FAILED_DIAL_STATUSES, true)) {
                 $entry['failed']++;
             }

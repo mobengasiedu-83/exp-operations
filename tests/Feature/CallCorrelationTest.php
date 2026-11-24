@@ -9,6 +9,7 @@ use App\Models\CorrelationException;
 use App\Models\Interaction;
 use App\Models\PbxConnection;
 use App\Services\CallCorrelator;
+use App\Services\CallTimelineProjector;
 use App\Services\GhanaPhoneNumber;
 use App\Services\PbxTelemetry;
 
@@ -287,4 +288,34 @@ test('caller number can come from a linked caller leg without replacing the inbo
     $interaction = Interaction::firstOrFail();
     expect($interaction->caller_number)->toBe('+233241*****67');
     expect($interaction->inbound_line)->toBe('059*****95');
+});
+
+test('a replay without the retained answer frames keeps the observed answer', function () {
+    $connection = PbxConnection::create(['name' => 'PBX', 'host' => '127.0.0.1']);
+    correlateCallFrames($connection, warmTransferFrames());
+
+    $leg = CallLeg::where('uniqueid', 'mobile')->firstOrFail();
+    $interaction = Interaction::firstOrFail();
+
+    expect($leg->answered_at)->not->toBeNull()
+        ->and($leg->dial_status)->toBe('ANSWER');
+
+    // Retention or a mis-filed frame removes the evidence a replay would use.
+    foreach (CallEvent::all() as $event) {
+        $data = $event->data;
+        $answered = ($event->event_name === 'Newstate' && ($data['primary_id'] ?? null) === 'mobile' && ($data['state'] ?? null) === 'Up')
+            || ($event->event_name === 'DialEnd' && ($data['dial_status'] ?? null) === 'ANSWER');
+
+        if ($answered) {
+            $event->delete();
+        }
+    }
+
+    app(CallTimelineProjector::class)->rebuild($interaction->fresh());
+
+    $leg->refresh();
+
+    expect($leg->answered_at)->not->toBeNull()
+        ->and($leg->dial_status)->toBe('ANSWER')
+        ->and($leg->ringing_at)->not->toBeNull();
 });

@@ -247,7 +247,7 @@ class CallTimeAnalytics
 
             $row['attempts']++;
 
-            if ($attempt->answered_at !== null) {
+            if ($attempt->answered_at !== null || in_array($attempt->status, TransferAttempt::ANSWERED_STATUSES, true)) {
                 $row['answered']++;
             }
 
@@ -290,7 +290,8 @@ class CallTimeAnalytics
             ->all();
 
         $matched = $attempts->whereNotNull('dentist_id')->count();
-        $answered = $attempts->whereNotNull('answered_at')->count();
+        $answered = $attempts->filter(fn (TransferAttempt $attempt): bool => $attempt->answered_at !== null
+            || in_array($attempt->status, TransferAttempt::ANSWERED_STATUSES, true))->count();
 
         return [
             'window' => $this->serialiseWindow($window),

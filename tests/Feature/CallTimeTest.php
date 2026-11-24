@@ -295,3 +295,33 @@ test('agent and viewer roles open the read-only operations overview', function (
         $this->get(route('live-operations.alerts'))->assertForbidden();
     }
 });
+
+test('dentist answers proven by a consultation bridge count without a network answer timestamp', function () {
+    $connection = callTimeConnection();
+    $dentist = Dentist::factory()->create(['name' => 'Dr Bridge']);
+    $journey = callTimeJourney($connection, 30);
+    $leg = callTimeLeg($journey, 'mobile', [
+        'started_at' => $journey->started_at,
+        'dial_started_at' => $journey->started_at->addSeconds(10),
+        'answered_at' => null,
+        'ended_at' => $journey->started_at->addSeconds(60),
+    ]);
+
+    TransferAttempt::factory()->create([
+        'interaction_id' => $journey->id,
+        'call_leg_id' => $leg->id,
+        'dentist_id' => $dentist->id,
+        'status' => 'consultation_observed',
+        'dial_started_at' => $journey->started_at->addSeconds(10),
+        'answered_at' => null,
+        'ended_at' => $journey->started_at->addSeconds(60),
+        'consultation_seconds' => 30,
+    ]);
+
+    $dentists = app(CallTimeAnalytics::class)->dentists(CallTimeAnalytics::DEFAULT_DAYS);
+    $row = collect($dentists['rows'])->firstWhere('dentist_id', $dentist->id);
+
+    expect($dentists['summary']['answered'])->toBe(1)
+        ->and($row['answered'])->toBe(1)
+        ->and($row['answer_rate'])->toBe(1.0);
+});

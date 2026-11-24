@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\CallBridge;
 use App\Models\CallLeg;
 use App\Models\Dentist;
 use App\Models\DentistAvailability;
@@ -8,6 +9,7 @@ use App\Models\DentistNumber;
 use App\Models\DentistRoster;
 use App\Models\Interaction;
 use App\Models\PbxConnection;
+use App\Models\TransferAttempt;
 use App\Models\User;
 use App\Services\DentistDirectory;
 use App\Services\GhanaPhoneNumber;
@@ -605,4 +607,85 @@ test('historical coverage uses the same date for credential summary and counts',
     expect($coverage['dentists'][0]['credential_state'])->toBe('valid')
         ->and($coverage['dentists'][0]['credentials_expired'])->toBe(0)
         ->and($coverage['dentists'][0]['credentials_expiring'])->toBe(0);
+});
+
+test('answered calls stay credited when the answer frame is missing from the leg', function () {
+    $connection = expDentistConnection();
+    $dentist = Dentist::factory()->create(['name' => 'Dr Evidence']);
+    DentistNumber::factory()->for($dentist)->create([
+        'number' => '+233241234567',
+        'original' => '0241234567',
+    ]);
+
+    // A DialEnd ANSWER survived, so the dial status alone proves the answer.
+    expDentistLeg($connection, 'PJSIP/trunk/0241234567-0000001', [
+        'dial_started_at' => now()->subMinutes(30),
+        'dial_status' => 'ANSWER',
+        'answered_at' => null,
+        'ended_at' => now()->subMinutes(25),
+    ]);
+
+    // Only tracker and bridge evidence survived for this attempt.
+    $bridged = expDentistLeg($connection, 'PJSIP/trunk/0241234567-0000002', [
+        'dial_started_at' => now()->subMinutes(20),
+        'dial_status' => null,
+        'answered_at' => null,
+        'ended_at' => now()->subMinutes(15),
+    ]);
+    CallBridge::create([
+        'interaction_id' => $bridged->interaction_id,
+        'bridge_uniqueid' => 'consultation',
+        'stage' => 'consultation',
+        'participants' => [$bridged->uniqueid, 'caller'],
+        'started_at' => now()->subMinutes(14),
+        'ended_at' => now()->subMinutes(9),
+        'duration_seconds' => 300,
+    ]);
+
+    $tracked = expDentistLeg($connection, 'PJSIP/trunk/0241234567-0000003', [
+        'dial_started_at' => now()->subMinutes(10),
+        'dial_status' => null,
+        'answered_at' => null,
+        'ended_at' => now()->subMinutes(8),
+    ]);
+    TransferAttempt::factory()->create([
+        'interaction_id' => $tracked->interaction_id,
+        'call_leg_id' => $tracked->id,
+        'dentist_id' => $dentist->id,
+        'status' => 'network_answered',
+        'answered_at' => null,
+    ]);
+
+    // No retained evidence: the attempt must stay unanswered.
+    expDentistLeg($connection, 'PJSIP/trunk/0241234567-0000004', [
+        'dial_started_at' => now()->subMinutes(5),
+        'dial_status' => 'NOANSWER',
+        'answered_at' => null,
+        'ended_at' => now()->subMinutes(4),
+    ]);
+
+    $this->actingAs(expDentistUser());
+
+    $this->get(route('dentists.index'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('dentists', function ($rows): bool {
+                $row = collect($rows)->firstWhere('name', 'Dr Evidence');
+
+                return $row['call_activity']['attempts_24h'] === 4
+                    && $row['call_activity']['answered_24h'] === 3;
+            }));
+
+    $this->get(route('dentists.performance'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('performance.summary.attempts', 4)
+            ->where('performance.summary.answered', 3)
+            ->where('performance.summary.failed', 1)
+            ->where('performance.rows', function ($rows): bool {
+                return count($rows) === 1
+                    && $rows[0]['attempts'] === 4
+                    && $rows[0]['answered'] === 3
+                    && $rows[0]['failed'] === 1;
+            }));
 });

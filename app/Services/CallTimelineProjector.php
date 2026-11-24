@@ -98,9 +98,12 @@ class CallTimelineProjector
         }
         $saved = [];
         foreach ($legs as $id => $values) {
-            $saved[$id] = CallLeg::updateOrCreate([
+            $leg = CallLeg::firstOrNew([
                 'pbx_connection_id' => $interaction->pbx_connection_id, 'uniqueid' => $id,
-            ], ['interaction_id' => $interaction->id, ...$values]);
+            ]);
+            $values = $this->retainObservedEvidence($leg, $values);
+            $leg->fill(['interaction_id' => $interaction->id, ...$values])->save();
+            $saved[$id] = $leg;
             if ($values['role'] === 'unknown') {
                 $this->issue($interaction, 'unknown_leg', $id);
             }
@@ -151,6 +154,43 @@ class CallTimelineProjector
         ]);
         $this->coverage->invalidate($interaction);
         $this->transfers->sync($interaction);
+    }
+
+    /**
+     * A replay only sees the frames that are still retained for this journey.
+     * Telemetry that was already observed must not be retracted because its
+     * source frame was pruned, dropped, or filed against another journey —
+     * otherwise an answered dentist leg silently reverts to "no answer".
+     *
+     * @param  array<string, mixed>  $values
+     * @return array<string, mixed>
+     */
+    private function retainObservedEvidence(CallLeg $leg, array $values): array
+    {
+        if (! $leg->exists) {
+            return $values;
+        }
+
+        $fields = [
+            'channel', 'role', 'entry_kind', 'inbound_masked', 'caller_masked', 'caller_hash',
+            'dial_status', 'started_at', 'dial_started_at', 'ringing_at', 'answered_at', 'ended_at',
+            'destination_hash', 'destination_masked',
+        ];
+
+        foreach ($fields as $field) {
+            $computed = $values[$field] ?? null;
+            $observed = $leg->getAttribute($field);
+
+            if (($computed === null || $computed === 'unknown') && $observed !== null && $observed !== 'unknown') {
+                $values[$field] = $observed;
+            }
+        }
+
+        if (($values['observed_creation'] ?? false) === false && $leg->observed_creation) {
+            $values['observed_creation'] = true;
+        }
+
+        return $values;
     }
 
     /**

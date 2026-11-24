@@ -38,6 +38,13 @@ class TransferAttempt extends Model
 
     public const FAILURE_STATUSES = ['busy', 'unanswered', 'failed', 'cancelled', 'transfer_failed', 'voicemail', 'declined'];
 
+    /**
+     * Statuses that a dentist mobile leg can only reach after the network
+     * answered it. They stay valid answer evidence when the ANSWER timestamp
+     * itself is missing from the retained telemetry.
+     */
+    public const ANSWERED_STATUSES = ['network_answered', 'consultation_observed', 'accepted', 'completed', 'voicemail', 'declined'];
+
     protected $fillable = ['interaction_id', 'call_leg_id', 'dentist_id', 'retry_of_id', 'sequence', 'destination_masked', 'match_status', 'dial_status', 'status', 'failure_reason', 'human_outcome', 'acceptance_confidence', 'fallback_status', 'timing_quality', 'dial_started_at', 'ringing_at', 'answered_at', 'ended_at', 'transfer_completed_at', 'human_accepted_at', 'dial_to_answer_seconds', 'ringing_seconds', 'mobile_connected_seconds', 'private_handover_seconds', 'consultation_seconds', 'revision'];
 
     protected function casts(): array
