@@ -61,12 +61,23 @@ const kpis = computed(() => [
 </script>
 
 <template>
-    <div class="operations-dashboard min-h-full p-4 sm:p-7 lg:p-9">
+    <div
+        class="min-h-full bg-gradient-to-b from-teal-50/70 via-background to-background p-4 sm:p-7 lg:p-9 dark:from-teal-950/25 dark:via-background dark:to-background"
+    >
         <Head title="Dashboard" />
 
         <div class="mx-auto max-w-7xl space-y-7">
-            <header class="operations-hero exp-rise relative isolate overflow-hidden rounded-[1.75rem] p-6 text-white sm:p-9 lg:p-11">
-                <div class="exp-grid absolute inset-0 -z-10 opacity-20" aria-hidden="true" />
+            <header
+                class="exp-rise relative isolate overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-teal-700 via-teal-800 to-emerald-900 p-6 text-white shadow-xl shadow-teal-950/20 sm:p-9 lg:p-11 dark:from-teal-800 dark:via-teal-900 dark:to-emerald-950"
+            >
+                <div
+                    class="exp-grid pointer-events-none absolute inset-0 -z-10 opacity-20"
+                    aria-hidden="true"
+                />
+                <div
+                    class="exp-drift pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-teal-300/25 blur-3xl"
+                    aria-hidden="true"
+                />
                 <div class="relative z-10 max-w-xl lg:max-w-[62%]">
                     <span class="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-[10px] font-semibold tracking-[.18em] text-teal-100 uppercase">
                         <span class="size-1.5 rounded-full bg-teal-200" /> Pepsodent · Talk to a Dentist
@@ -116,7 +127,7 @@ const kpis = computed(() => [
 
             <section class="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
                 <article
-                    class="operations-panel exp-rise exp-rise-3 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"
+                    class="exp-rise exp-rise-3 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
