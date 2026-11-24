@@ -48,8 +48,19 @@ const gradient = computed(() =>
             style="animation-delay: -4s"
             aria-hidden="true"
         />
+        <div
+            class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"
+            aria-hidden="true"
+        />
 
-        <div class="relative flex flex-wrap items-start justify-between gap-6">
+        <div
+            class="relative"
+            :class="
+                $slots.artwork
+                    ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center'
+                    : 'flex flex-wrap items-start justify-between gap-6'
+            "
+        >
             <div class="max-w-2xl space-y-3">
                 <p
                     v-if="eyebrow"
@@ -69,6 +80,13 @@ const gradient = computed(() =>
                 >
                     Welcome back, {{ firstName }}.
                 </p>
+            </div>
+            <div
+                v-if="$slots.artwork"
+                class="pointer-events-none hidden xl:row-span-2 xl:block xl:justify-self-end"
+                aria-hidden="true"
+            >
+                <slot name="artwork" />
             </div>
             <div class="flex flex-wrap items-center gap-3">
                 <slot name="actions" />

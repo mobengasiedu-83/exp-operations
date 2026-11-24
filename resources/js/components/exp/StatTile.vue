@@ -9,7 +9,7 @@ const props = withDefaults(
         hint?: string;
         tone?: 'emerald' | 'sky' | 'amber' | 'rose' | 'slate' | 'onDark';
         icon?: Component;
-        delay?: 1 | 2 | 3 | 4;
+        delay?: 1 | 2 | 3 | 4 | 5;
     }>(),
     { tone: 'slate', delay: 1 },
 );

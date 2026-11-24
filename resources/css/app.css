@@ -219,6 +219,10 @@
     animation-delay: 240ms;
 }
 
+.exp-rise-5 {
+    animation-delay: 300ms;
+}
+
 .exp-drift {
     animation: exp-drift 10s ease-in-out infinite;
 }
@@ -241,12 +245,99 @@
     background-size: 22px 22px;
 }
 
+/* Connectors, floating affordances and staggered table rows. As above, every
+   rule is decorative: the reduced-motion block turns them all off. */
+@keyframes exp-flow {
+    to {
+        stroke-dashoffset: -320;
+    }
+}
+
+@keyframes exp-float {
+    0%,
+    100% {
+        transform: translate3d(0, 0, 0);
+    }
+    50% {
+        transform: translate3d(0, -6px, 0);
+    }
+}
+
+@keyframes exp-ping-soft {
+    0% {
+        opacity: 0.55;
+        transform: scale(0.85);
+    }
+    70%,
+    100% {
+        opacity: 0;
+        transform: scale(1.7);
+    }
+}
+
+@keyframes exp-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.94);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes exp-shimmer {
+    from {
+        background-position: -160% 0;
+    }
+    to {
+        background-position: 260% 0;
+    }
+}
+
+.exp-flow {
+    animation: exp-flow 7s linear infinite;
+}
+
+.exp-float {
+    animation: exp-float 5.5s ease-in-out infinite;
+}
+
+.exp-ping-soft {
+    animation: exp-ping-soft 2.8s ease-out infinite;
+}
+
+.exp-pop {
+    animation: exp-pop 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.exp-row {
+    animation: exp-fade 0.45s ease both;
+}
+
+.exp-shimmer {
+    background-image: linear-gradient(
+        100deg,
+        transparent 25%,
+        rgb(255 255 255 / 35%) 50%,
+        transparent 75%
+    );
+    background-size: 220% 100%;
+    animation: exp-shimmer 2.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .exp-rise,
     .exp-fade,
     .exp-drift,
     .exp-ring,
-    .exp-sheen {
+    .exp-sheen,
+    .exp-flow,
+    .exp-float,
+    .exp-ping-soft,
+    .exp-pop,
+    .exp-row,
+    .exp-shimmer {
         animation: none !important;
     }
 }
@@ -803,6 +894,103 @@
 @media (prefers-reduced-motion: reduce) {
     html:has(.guide-prose) {
         scroll-behavior: auto;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Shared form and action primitives.
+
+   These exist so every console page styles its filter forms and secondary
+   actions the same way. They intentionally depend only on theme tokens, so the
+   same classes work in light and dark mode.
+--------------------------------------------------------------------------- */
+@layer components {
+    .exp-label {
+        display: grid;
+        gap: 0.375rem;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        color: var(--muted-foreground);
+        text-transform: uppercase;
+    }
+
+    .exp-field {
+        height: 2.5rem;
+        width: 100%;
+        border-radius: 0.75rem;
+        border: 1px solid var(--border);
+        background: var(--background);
+        padding: 0 0.75rem;
+        color: var(--foreground);
+        font-size: 0.875rem;
+        box-shadow: 0 1px 2px rgb(2 6 23 / 4%);
+        outline: none;
+        transition:
+            border-color 0.18s ease,
+            box-shadow 0.18s ease;
+    }
+
+    .exp-field:focus-visible {
+        border-color: color-mix(in oklab, var(--color-emerald-500) 60%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-emerald-500) 18%, transparent);
+    }
+
+    .exp-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border-radius: 0.75rem;
+        border: 1px solid var(--border);
+        background: var(--card);
+        padding: 0.5rem 0.9rem;
+        color: var(--foreground);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        box-shadow: 0 1px 2px rgb(2 6 23 / 5%);
+        transition:
+            transform 0.18s ease,
+            box-shadow 0.18s ease,
+            border-color 0.18s ease,
+            color 0.18s ease,
+            background-color 0.18s ease;
+    }
+
+    .exp-btn:hover {
+        transform: translateY(-1px);
+        border-color: color-mix(in oklab, var(--color-emerald-500) 40%, var(--border));
+        color: var(--color-emerald-700);
+        box-shadow: 0 6px 16px -10px rgb(2 44 34 / 45%);
+    }
+
+    .dark .exp-btn:hover {
+        color: var(--color-emerald-300);
+    }
+
+    .exp-btn-primary {
+        border-color: transparent;
+        background: var(--color-emerald-600);
+        color: white;
+        box-shadow: 0 10px 24px -16px rgb(4 120 87 / 90%);
+    }
+
+    .exp-btn-primary:hover {
+        border-color: transparent;
+        background: var(--color-emerald-700);
+        color: white;
+        box-shadow: 0 14px 28px -16px rgb(4 120 87 / 90%);
+    }
+
+    .exp-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 9999px;
+        padding: 0.2rem 0.55rem;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        line-height: 1.25rem;
+        white-space: nowrap;
     }
 }
 

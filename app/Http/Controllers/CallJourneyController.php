@@ -11,6 +11,7 @@ use App\Models\ScreeningProtocol;
 use App\Models\TransferAttempt;
 use App\Models\User;
 use App\Services\CallHistoryRecord;
+use App\Services\CallHistorySummary;
 use App\Services\CallJourneyTimeline;
 use App\Services\CallReconciler;
 use App\Services\GhanaPhoneNumber;
@@ -38,9 +39,10 @@ class CallJourneyController extends Controller
     {
         abort_unless($request->user()?->canAny(['view pbx', 'view call history']), 403);
         $filters = $this->filters($request);
+        $query = $this->filteredQuery($filters, $request->user());
 
         return Inertia::render('Calls/Index', [
-            'interactions' => $this->filteredQuery($filters, $request->user())
+            'interactions' => (clone $query)
                 ->with($this->historyRelations())
                 ->withCount(['legs', 'events', 'exceptions'])
                 ->orderByDesc('started_at')->orderByDesc('id')->paginate(25)->withQueryString()
@@ -48,6 +50,7 @@ class CallJourneyController extends Controller
                     ...$interaction->makeHidden(['legs', 'callerCase', 'attempts'])->append(['caller_number', 'inbound_line', 'dentist_number'])->toArray(),
                     ...collect(app(CallHistoryRecord::class)->summary($interaction, $request->user()))->except('case_record')->all(),
                 ]),
+            'summary' => app(CallHistorySummary::class)->for($query),
             'filters' => array_filter($filters, fn (mixed $value): bool => filled($value)),
             'agents' => User::query()
                 ->whereIn('id', CallerCase::query()->whereNotNull('assigned_to')->select('assigned_to'))

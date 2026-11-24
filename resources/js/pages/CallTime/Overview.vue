@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import { AudioLines, Clock, Headphones, PhoneIncoming, Stethoscope } from '@lucide/vue';
+import { AudioLines, Clock, Headphones, PhoneCall, PhoneIncoming, Stethoscope } from '@lucide/vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import Heading from '@/components/Heading.vue';
 import CallTimeNav from '@/components/CallTimeNav.vue';
@@ -30,10 +30,17 @@ function search(): void {
 
 const headline = computed(() => [
     {
+        label: 'Inbound calls',
+        value: props.overview.calls.total,
+        hint: `${props.overview.calls.answered} answered · ${props.overview.calls.abandoned} no agent answer`,
+        tone: 'emerald' as const,
+        icon: PhoneCall,
+    },
+    {
         label: 'Total call time',
         value: formatTime(props.overview.totals.total_seconds),
-        hint: `${props.overview.calls.total} journeys in the window`,
-        tone: 'emerald' as const,
+        hint: `Journey start to last hangup · average ${formatTime(props.overview.averages.total_seconds)}`,
+        tone: 'slate' as const,
         icon: Clock,
     },
     {
@@ -108,7 +115,7 @@ const outcomes = computed(() => [
             </form>
 
             <section
-                class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+                class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
                 aria-label="Call time totals"
             >
                 <StatTile
@@ -119,7 +126,7 @@ const outcomes = computed(() => [
                     :hint="metric.hint"
                     :icon="metric.icon"
                     :tone="metric.tone"
-                    :delay="(index + 1) as 1 | 2 | 3 | 4"
+                    :delay="(index + 1) as 1 | 2 | 3 | 4 | 5"
                 />
             </section>
 
