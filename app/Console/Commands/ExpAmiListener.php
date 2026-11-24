@@ -86,8 +86,12 @@ class ExpAmiListener extends Command
                         if (isset($frame['Event'])) {
                             $telemetry->event($connection, $frame);
                         }
-                        if (($frame['ActionID'] ?? null) === 'exp-heartbeat') {
-                            if (($frame['Response'] ?? null) !== 'Success') {
+                        // Any inbound frame proves the socket is alive. PBX builds answer `Ping`
+                        // with `Response: Pong` (and some omit the ActionID entirely), so a busy
+                        // feed must never be mistaken for a dead heartbeat and forced to reconnect.
+                        if ($frame !== null && $pendingPing !== null) {
+                            if (($frame['ActionID'] ?? null) === 'exp-heartbeat'
+                                && ! in_array(strtolower((string) ($frame['Response'] ?? '')), ['success', 'pong'], true)) {
                                 throw new RuntimeException('AMI heartbeat rejected.');
                             }
                             $pendingPing = null;

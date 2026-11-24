@@ -47,6 +47,9 @@ return [
         'heartbeat_timeout_seconds' => max(10, (int) env('EXP_PBX_HEARTBEAT_TIMEOUT_SECONDS', 45)),
         'prune_interval_seconds' => max(10, (int) env('EXP_PBX_PRUNE_INTERVAL_SECONDS', 60)),
         'long_ringing_seconds' => (int) env('EXP_LONG_RINGING_SECONDS', 45),
+        // Journeys with no AMI evidence for this long are closed once their feed is live again,
+        // so a listener reconnect cannot leave calls stuck in "Active now" forever.
+        'stale_journey_minutes' => max(1, (int) env('EXP_STALE_JOURNEY_MINUTES', 15)),
         'alert_lookback_minutes' => (int) env('EXP_ALERT_LOOKBACK_MINUTES', 1440),
         'agent_presence_window_minutes' => (int) env('EXP_AGENT_PRESENCE_WINDOW_MINUTES', 10),
         'dentist_unmatched_lookback_days' => (int) env('EXP_DENTIST_UNMATCHED_LOOKBACK_DAYS', 7),

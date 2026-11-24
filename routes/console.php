@@ -14,6 +14,8 @@ Schedule::command('horizon:snapshot')->everyFiveMinutes();
 
 Schedule::command('exp:reconcile-calls --pending')->everyMinute()->withoutOverlapping();
 
+Schedule::command('exp:close-stale-journeys')->everyMinute()->withoutOverlapping();
+
 Schedule::command('exp:evaluate-alerts')->everyMinute()->withoutOverlapping();
 
 Schedule::command('exp:escalate-callbacks')->everyFiveMinutes()->withoutOverlapping();
