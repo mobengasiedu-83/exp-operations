@@ -69,7 +69,7 @@ function workspaceProfile(): array
 {
     return [
         'preferred_name' => 'Caller preferred name', 'callback_number' => '0241234567', 'age_band' => 'adult',
-        'guardian_confirmed' => false, 'contact_kind' => 'genuine', 'concern_type' => 'clinical',
+        'guardian_confirmed' => false, 'concern_type' => 'clinical',
         'concern' => 'Caller-reported concern', 'onset' => 'Two days', 'impact' => 'Caller reports interrupted sleep',
     ];
 }
@@ -271,6 +271,87 @@ test('child details require an approved guardian flow and confirmed relationship
     workspaceChange($case, 'profile', $profile)->assertSessionHasErrors('guardian_name');
     workspaceChange($case, 'profile', [...$profile, 'guardian_name' => 'Guardian', 'guardian_relationship' => 'Parent', 'guardian_confirmed' => true])->assertSessionHasNoErrors();
     expect($case->fresh()->guardian_confirmed)->toBeTrue()->and($case->fresh()->guardian_name)->toBe('Guardian');
+});
+
+test('a genuine call type decision keeps the case open and allows the questionnaire', function () {
+    $this->freezeTime();
+    $user = workspaceUser();
+    $this->actingAs($user);
+    $case = workspaceCase($user);
+    $protocol = workspaceProtocol();
+    workspaceChange($case, 'consent', ['protocol_id' => $protocol->id, 'status' => 'granted', 'callback_allowed' => true])->assertSessionHasNoErrors();
+
+    workspaceChange($case, 'contact_kind', ['contact_kind' => 'genuine'])->assertSessionHasNoErrors();
+
+    $case->refresh();
+    expect($case->contact_kind)->toBe('genuine')
+        ->and($case->contact_kind_confirmed_at)->not->toBeNull()
+        ->and($case->status)->toBe('open');
+    $audit = Activity::query()->where('subject_type', CallerCase::class)
+        ->where('subject_id', $case->id)->where('properties->operation', 'contact_kind')->sole();
+    expect($audit->properties->get('contact_kind'))->toBe('genuine')
+        ->and($audit->properties->get('questionnaire_opened'))->toBeTrue();
+
+    workspaceChange($case, 'screening', workspaceAnswers($protocol))->assertSessionHasNoErrors();
+    expect($case->fresh()->screenings()->count())->toBe(1);
+});
+
+test('a nuisance or prank call type decision ends the flow without opening the questionnaire', function () {
+    $user = workspaceUser();
+    $this->actingAs($user);
+    $case = workspaceCase($user);
+    $case->update(['priority' => 'P3']);
+    $protocol = workspaceProtocol();
+
+    workspaceChange($case, 'contact_kind', ['contact_kind' => 'nuisance', 'note' => 'Caller repeated the same prank'])->assertSessionHasNoErrors();
+
+    $case->refresh();
+    expect($case->status)->toBe('closed')
+        ->and($case->disposition)->toBe('contact_ended')
+        ->and($case->priority)->toBeNull()
+        ->and($case->contact_kind)->toBe('nuisance')
+        ->and($case->contact_kind_confirmed_at)->not->toBeNull()
+        ->and($case->closed_by)->toBe($user->id)
+        ->and($case->next_step)->toContain('Caller repeated the same prank');
+    $audit = Activity::query()->where('subject_type', CallerCase::class)
+        ->where('subject_id', $case->id)->where('properties->operation', 'contact_kind')->sole();
+    expect($audit->properties->get('contact_kind'))->toBe('nuisance')
+        ->and($audit->properties->get('questionnaire_opened'))->toBeFalse();
+
+    workspaceChange($case, 'screening', workspaceAnswers($protocol))->assertSessionHasErrors('case');
+    $this->assertDatabaseCount('screenings', 0);
+
+    $this->get(route('workspace.show', $case))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('callerCase.contact_kind', 'nuisance')
+        ->where('callerCase.disposition', 'contact_ended')
+        ->where('canEdit', false)
+        ->where('canReclassify', true)
+        ->has('contactKinds'));
+});
+
+test('a closed contact ended case reopens only when reclassified as genuine before any screen', function () {
+    $user = workspaceUser();
+    $this->actingAs($user);
+    $case = workspaceCase($user);
+    $protocol = workspaceProtocol();
+    workspaceChange($case, 'contact_kind', ['contact_kind' => 'silent'])->assertSessionHasNoErrors();
+    expect($case->fresh()->status)->toBe('closed');
+
+    workspaceChange($case, 'contact_kind', ['contact_kind' => 'genuine'])->assertSessionHasNoErrors();
+
+    $case->refresh();
+    expect($case->status)->toBe('open')
+        ->and($case->disposition)->toBeNull()
+        ->and($case->next_step)->toBeNull()
+        ->and($case->closed_at)->toBeNull()
+        ->and($case->closed_by)->toBeNull()
+        ->and($case->contact_kind)->toBe('genuine');
+    workspaceChange($case, 'screening', workspaceAnswers($protocol))->assertSessionHasNoErrors();
+
+    workspaceChange($case, 'contact_kind', ['contact_kind' => 'nuisance'])->assertSessionHasErrors('contact_kind');
+    expect($case->fresh()->contact_kind)->toBe('genuine')
+        ->and($case->fresh()->status)->toBe('open');
+    $this->assertDatabaseCount('screenings', 1);
 });
 
 test('screening routes emergency urgent routine FAQ and unclear simulations safely', function (string $requested, string $emergency, string $urgent, string $expected) {

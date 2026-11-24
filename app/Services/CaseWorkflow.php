@@ -17,6 +17,19 @@ class CaseWorkflow
 {
     public const PRIORITIES = ['P1', 'P2', 'P3', 'S', 'Review'];
 
+    /**
+     * The call-type decision taken with the caller after consent. Only a genuine
+     * call continues to the questionnaire; every other type ends the flow.
+     */
+    public const CONTACT_KINDS = [
+        'genuine' => 'Genuine call',
+        'nuisance' => 'Nuisance or prank call',
+        'unclear' => 'Unclear genuine call',
+        'abandoned' => 'Abandoned call',
+        'silent' => 'Silent call',
+        'ultra_short' => 'Ultra-short call',
+    ];
+
     public const DISPOSITIONS = [
         'emergency_escalation' => ['label' => 'Emergency instructions and supervisor escalation', 'priorities' => ['P1']],
         'urgent_referral' => ['label' => 'Urgent referral / priority clinician handover', 'priorities' => ['P2']],
@@ -33,11 +46,13 @@ class CaseWorkflow
         DB::transaction(function () use ($case, $user, $data, $operation): void {
             $case = CallerCase::query()->visibleTo($user)->lockForUpdate()->findOrFail($case->id);
             $withdrawal = $operation === 'consent' && ($data['status'] ?? null) === 'withdrawn';
-            $this->require($case->status !== 'closed' || $withdrawal, 'case', 'This case is closed. Only withdrawal of existing consent may be recorded.');
+            $reclassify = $operation === 'contact_kind' && $case->status === 'closed' && $case->disposition === 'contact_ended';
+            $this->require($case->status !== 'closed' || $withdrawal || $reclassify, 'case', 'This case is closed. Only withdrawal of existing consent may be recorded.');
             $this->require($case->revision === (int) $data['revision'], 'revision', 'This case changed. Reload it before saving to avoid overwriting another operator.');
 
             match ($operation) {
                 'consent' => $this->consent($case, $user, $data),
+                'contact_kind' => $this->classify($case, $user, $data),
                 'profile' => $this->profile($case, $data),
                 'screening' => $this->screen($case, $user, $data),
                 'note' => $this->note($case, $user, $data),
@@ -46,13 +61,20 @@ class CaseWorkflow
             };
 
             $case->increment('revision');
-            $evidence = $operation === 'close' ? [
-                'disposition' => $data['disposition'],
-                'emergency_action_confirmed' => $data['emergency_action_confirmed'] ?? false,
-                'supervisor_notified' => $data['supervisor_notified'] ?? false,
-                'faq_confirmed' => $data['faq_confirmed'] ?? false,
-                'screening_id' => $case->screenings()->latest('id')->value('id'),
-            ] : [];
+            $evidence = match ($operation) {
+                'contact_kind' => [
+                    'contact_kind' => $data['contact_kind'],
+                    'questionnaire_opened' => $case->contact_kind === 'genuine' && $case->status !== 'closed',
+                ],
+                'close' => [
+                    'disposition' => $data['disposition'],
+                    'emergency_action_confirmed' => $data['emergency_action_confirmed'] ?? false,
+                    'supervisor_notified' => $data['supervisor_notified'] ?? false,
+                    'faq_confirmed' => $data['faq_confirmed'] ?? false,
+                    'screening_id' => $case->screenings()->latest('id')->value('id'),
+                ],
+                default => [],
+            };
             activity('case-workflow')->causedBy($user)->performedOn($case)
                 ->withProperties(['operation' => $operation, 'revision' => $case->revision, ...$evidence])
                 ->log('Case workflow updated');
@@ -120,6 +142,7 @@ class CaseWorkflow
         return DB::transaction(function () use ($case, $user, $data): ScreeningDraft {
             $case = CallerCase::query()->visibleTo($user)->lockForUpdate()->findOrFail($case->id);
             $this->require($case->status !== 'closed', 'case', 'This case is closed. Autosaved answers cannot be changed.');
+            $this->requireGenuineCall($case);
             $protocol = $this->captureProtocol($case, (int) $data['protocol_id']);
             $this->require($protocol->questions->isNotEmpty(), 'answers', 'The questionnaire has no questions.');
             $answers = collect($data['answers'])->keyBy('question_id');
@@ -185,14 +208,73 @@ class CaseWorkflow
             'age_band' => $data['age_band'], 'guardian_name' => $child ? $data['guardian_name'] : null,
             'guardian_relationship' => $child ? $data['guardian_relationship'] : null,
             'guardian_confirmed' => $child && (bool) ($data['guardian_confirmed'] ?? false),
-            'contact_kind' => $data['contact_kind'], 'concern_type' => $data['concern_type'],
+            'concern_type' => $data['concern_type'],
             'concern' => $data['concern'] ?? null, 'onset' => $data['onset'] ?? null, 'impact' => $data['impact'] ?? null,
         ]);
+    }
+
+    /**
+     * Record the call-type decision taken with the caller after consent. A genuine
+     * call continues to the questionnaire; any other type ends the flow, closes
+     * the case and never opens a screening form.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function classify(CallerCase $case, User $user, array $data): void
+    {
+        $kind = $data['contact_kind'];
+        $genuine = $kind === 'genuine';
+        $this->require(
+            $genuine || $case->screenings()->doesntExist(),
+            'contact_kind',
+            'A screening is already recorded for this case, so it can no longer be classified as a non-genuine call.',
+        );
+
+        $case->update(['contact_kind' => $kind, 'contact_kind_confirmed_at' => now()]);
+
+        if ($genuine) {
+            if ($case->status === 'closed' && $case->disposition === 'contact_ended') {
+                $case->update(['status' => 'open', 'disposition' => null, 'next_step' => null, 'closed_at' => null, 'closed_by' => null]);
+            }
+
+            return;
+        }
+
+        $case->update([
+            'priority' => null,
+            'disposition' => 'contact_ended',
+            'next_step' => $this->contactKindSummary($kind, $data['note'] ?? null),
+            'status' => 'closed',
+            'closed_at' => now(),
+            'closed_by' => $user->id,
+        ]);
+    }
+
+    private function contactKindSummary(string $kind, ?string $note): string
+    {
+        $summary = self::CONTACT_KINDS[$kind].' — the call ended before the screening questionnaire was opened.';
+
+        return filled($note) ? $summary.' Note: '.trim($note) : $summary;
+    }
+
+    /**
+     * The questionnaire sits behind the post-consent call-type decision, so a
+     * recorded nuisance/prank outcome can never be screened afterwards.
+     */
+    private function requireGenuineCall(CallerCase $case): void
+    {
+        $recorded = $case->contact_kind_confirmed_at !== null;
+        $this->require(
+            ! $recorded || $case->contact_kind === 'genuine',
+            'contact_kind',
+            'This call was recorded as "'.(self::CONTACT_KINDS[$case->contact_kind] ?? $case->contact_kind).'". Only genuine calls can be screened.',
+        );
     }
 
     /** @param array<string, mixed> $data */
     private function screen(CallerCase $case, User $user, array $data): void
     {
+        $this->requireGenuineCall($case);
         $protocol = $this->captureProtocol($case, (int) $data['protocol_id']);
         if (! is_array($data['answers'])) {
             throw ValidationException::withMessages(['answers' => 'Provide the questionnaire answers.']);

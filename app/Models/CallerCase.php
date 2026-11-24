@@ -36,12 +36,13 @@ class CallerCase extends Model
         return filled($name) ? hash_hmac('sha256', mb_strtolower(trim($name)), config('app.key')) : null;
     }
 
-    protected $fillable = ['interaction_id', 'assigned_to', 'association_verified_by', 'association_verified_at', 'status', 'priority', 'contact_kind', 'concern_type', 'age_band', 'preferred_name', 'callback_number', 'guardian_name', 'guardian_relationship', 'guardian_confirmed', 'concern', 'onset', 'impact', 'next_step', 'disposition', 'closed_by', 'closed_at', 'revision'];
+    protected $fillable = ['interaction_id', 'assigned_to', 'association_verified_by', 'association_verified_at', 'status', 'priority', 'contact_kind', 'contact_kind_confirmed_at', 'concern_type', 'age_band', 'preferred_name', 'callback_number', 'guardian_name', 'guardian_relationship', 'guardian_confirmed', 'concern', 'onset', 'impact', 'next_step', 'disposition', 'closed_by', 'closed_at', 'revision'];
 
     protected function casts(): array
     {
         return [
-            'association_verified_at' => 'immutable_datetime', 'closed_at' => 'immutable_datetime',
+            'association_verified_at' => 'immutable_datetime', 'contact_kind_confirmed_at' => 'immutable_datetime',
+            'closed_at' => 'immutable_datetime',
             'guardian_confirmed' => 'boolean', 'revision' => 'integer',
             'preferred_name' => 'encrypted', 'callback_number' => 'encrypted',
             'guardian_name' => 'encrypted', 'guardian_relationship' => 'encrypted',

@@ -119,7 +119,12 @@ class AgentWorkspaceController extends Controller
             'screenings' => $screenings,
             'notes' => $case->notes()->latest('id')->get(),
             'dispositions' => collect(CaseWorkflow::DISPOSITIONS)->map(fn (array $row, string $code): array => ['code' => $code, ...$row])->values(),
+            'contactKinds' => CaseWorkflow::CONTACT_KINDS,
             'canEdit' => $user->can('edit cases') && $case->status !== 'closed',
+            'canReclassify' => $user->can('edit cases') && (
+                $case->status !== 'closed'
+                || ($case->disposition === 'contact_ended' && $screenings->isEmpty())
+            ),
             'canWithdrawConsent' => $user->can('edit cases') && $consent?->status === 'granted',
             'canReview' => $user->can('review cases'),
             'canControl' => $user->can('control calls') && $case->status !== 'closed'
@@ -160,13 +165,17 @@ class AgentWorkspaceController extends Controller
         $this->visible($request, $case);
         $base = $request->validate([
             'revision' => ['required', 'integer', 'min:1'],
-            'operation' => ['required', Rule::in(['consent', 'profile', 'screening', 'note', 'close'])],
+            'operation' => ['required', Rule::in(['consent', 'contact_kind', 'profile', 'screening', 'note', 'close'])],
         ]);
         $rules = match ($base['operation']) {
             'consent' => [
                 'protocol_id' => ['required', 'integer', 'exists:screening_protocols,id'],
                 'status' => ['required', Rule::in(['granted', 'declined', 'unable', 'withdrawn'])],
                 'callback_allowed' => ['required', 'boolean'],
+            ],
+            'contact_kind' => [
+                'contact_kind' => ['required', Rule::in(array_keys(CaseWorkflow::CONTACT_KINDS))],
+                'note' => ['nullable', 'string', 'max:500'],
             ],
             'profile' => [
                 'preferred_name' => ['nullable', 'string', 'max:100'],
@@ -175,7 +184,6 @@ class AgentWorkspaceController extends Controller
                 'guardian_name' => ['nullable', 'string', 'max:100'],
                 'guardian_relationship' => ['nullable', 'string', 'max:100'],
                 'guardian_confirmed' => ['required', 'boolean'],
-                'contact_kind' => ['required', Rule::in(['genuine', 'unclear', 'abandoned', 'silent', 'nuisance', 'ultra_short'])],
                 'concern_type' => ['required', Rule::in(['clinical', 'service_information'])],
                 'concern' => ['nullable', 'string', 'max:2000'],
                 'onset' => ['nullable', 'string', 'max:500'], 'impact' => ['nullable', 'string', 'max:1000'],

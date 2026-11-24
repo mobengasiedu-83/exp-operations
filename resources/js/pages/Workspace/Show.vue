@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { Head, Link, useForm, usePoll } from "@inertiajs/vue3";
 import AppLayout from "@/layouts/AppLayout.vue";
-import CallControls from "@/components/CallControls.vue";
 import { draft as draftRoute, index, update } from "@/routes/workspace";
-import { index as dentists } from "@/routes/dentists";
-import { formatClock, formatSeconds, freshnessClasses, stageLabel } from "@/lib/live-operations";
+import { formatClock, freshnessClasses } from "@/lib/live-operations";
 import { screeningSummary, summaryQuestions } from "@/lib/live-screening";
 import { draftStorageKey } from "@/lib/screening-draft";
 import { useScreeningDraft, type ScreeningDraft } from "@/composables/useScreeningDraft";
@@ -119,6 +117,7 @@ type Case = {
     guardian_confirmed: boolean;
     concern_type: string;
     contact_kind: string;
+    contact_kind_confirmed_at: string | null;
     concern: string | null;
     onset: string | null;
     impact: string | null;
@@ -158,7 +157,9 @@ const props = defineProps<{
         created_at: string;
     }[];
     dispositions: { code: string; label: string; priorities: string[] }[];
+    contactKinds: Record<string, string>;
     canEdit: boolean;
+    canReclassify: boolean;
     canReview: boolean;
     canControl: boolean;
     selectableDentists: {
@@ -173,7 +174,6 @@ const profile = useForm({
     guardian_name: props.callerCase.guardian_name ?? "",
     guardian_relationship: props.callerCase.guardian_relationship ?? "",
     guardian_confirmed: props.callerCase.guardian_confirmed,
-    contact_kind: props.callerCase.contact_kind,
     concern_type: props.callerCase.concern_type,
     concern: props.callerCase.concern ?? "",
     onset: props.callerCase.onset ?? "",
@@ -217,6 +217,43 @@ watch(
         safety.clearErrors();
     },
 );
+const classification = useForm({
+    contact_kind: props.callerCase.contact_kind_confirmed_at ? props.callerCase.contact_kind : "",
+    note: "",
+});
+const isClassified = computed(() => props.callerCase.contact_kind_confirmed_at !== null);
+const isGenuine = computed(
+    () => isClassified.value && props.callerCase.contact_kind === "genuine",
+);
+const showsQuestionnaire = computed(() => classification.contact_kind === "genuine");
+const endsCall = computed(
+    () => classification.contact_kind !== "" && classification.contact_kind !== "genuine",
+);
+const submitLabel = computed(() => {
+    if (endsCall.value) {
+        return "End call and close case";
+    }
+
+    return props.callerCase.status === "closed" ? "Reopen as genuine call" : "Save call type";
+});
+function classifyCall() {
+    if (!classification.contact_kind) {
+        classification.setError("contact_kind", "Choose whether this is a genuine call.");
+
+        return;
+    }
+
+    classification
+        .transform((data) => ({
+            ...data,
+            revision: props.callerCase.revision,
+            operation: "contact_kind",
+        }))
+        .patch(update.url(props.callerCase.id), {
+            preserveScroll: true,
+            onSuccess: () => classification.reset("note"),
+        });
+}
 const draftKey = computed(() =>
     props.protocol
         ? draftStorageKey(props.callerCase.id, props.protocol.id)
@@ -235,7 +272,7 @@ const {
 } = useScreeningDraft({
     url: draftRoute.url(props.callerCase.id),
     storageKey: draftKey.value,
-    enabled: () => props.canEdit && props.protocol !== null,
+    enabled: () => props.canEdit && props.protocol !== null && isGenuine.value,
     payload: () => ({
         protocol_id: props.protocol?.id ?? 0,
         priority: safety.priority,
@@ -258,7 +295,6 @@ const {
         });
     },
 });
-const note = useForm({ body: "" });
 const inputClass =
     "min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 const askedQuestions = computed(() => (props.protocol?.questions ?? []).filter(isAsked));
@@ -278,21 +314,7 @@ function choices(question: Question): { value: string; label: string }[] {
     ];
 }
 
-const liveEvidence = ref(props.canEdit);
-const { start: startEvidence, stop: stopEvidence } = usePoll(
-    5000,
-    { only: ["callContext", "lifecycle"] },
-    { autoStart: props.canEdit },
-);
-function toggleEvidence() {
-    liveEvidence.value = !liveEvidence.value;
-
-    if (liveEvidence.value) {
-        startEvidence();
-    } else {
-        stopEvidence();
-    }
-}
+usePoll(5000, { only: ["callContext", "lifecycle"] }, { autoStart: props.canEdit });
 function discardAndReload() {
     discardLocal();
     window.location.reload();
@@ -326,26 +348,6 @@ function isAsked(question: Question): boolean {
         (question.conditional_answer ?? "").toLowerCase()
     );
 }
-function availabilityClass(status: SelectableDentist["availability_status"]): string {
-    return status === "available"
-        ? "text-green-700 dark:text-green-400"
-        : status === "busy"
-          ? "text-amber-700 dark:text-amber-400"
-          : "text-red-700 dark:text-red-400";
-}
-const handover = computed(() => {
-    const c = props.callerCase;
-    const last = props.screenings[0];
-    const protocol = props.historyProtocols.find((p) => p.id === last?.screening_protocol_id);
-    const findings =
-        last?.answers
-            .map(
-                (a) =>
-                    `${a.question_prompt ?? protocol?.questions.find((q) => q.id === a.screening_question_id)?.prompt ?? "Question"}: ${a.answer}`,
-            )
-            .join("\n") ?? "Safety screen not yet recorded.";
-    return `Situation: Case #${c.id}; ${c.priority ?? "Unclassified"}; ${c.concern ?? "Concern not recorded"}.\nBackground: ${c.age_band}; onset ${c.onset ?? "not recorded"}; impact ${c.impact ?? "not recorded"}. Callback ${c.callback_number ? "ending " + c.callback_number.slice(-4) : "not recorded"}.\nAssessment information (caller-reported facts; no diagnosis):\n${findings}\nRequest: ${c.next_step ?? "Clinician assessment / approved next step to be recorded."}`;
-});
 function saveProfile(andScreen = false) {
     profile
         .transform((data) => ({
@@ -394,16 +396,6 @@ function saveScreen() {
             onSuccess: () => markRecorded(),
         });
 }
-function saveNote() {
-    note.transform((data) => ({
-        ...data,
-        revision: props.callerCase.revision,
-        operation: "note",
-    })).patch(update.url(props.callerCase.id), {
-        preserveScroll: true,
-        onSuccess: () => note.reset(),
-    });
-}
 function closeCase() {
     closure
         .transform((data) => ({
@@ -412,9 +404,6 @@ function closeCase() {
             operation: "close",
         }))
         .patch(update.url(props.callerCase.id), { preserveScroll: true });
-}
-async function copyHandover() {
-    await navigator.clipboard.writeText(handover.value);
 }
 </script>
 
@@ -428,7 +417,7 @@ async function copyHandover() {
                         >← Back to workspace</Link
                     >
                     <h1 class="text-2xl font-semibold">
-                        Call notes <span class="text-muted-foreground">#{{ callerCase.id }}</span>
+                        Call <span class="text-muted-foreground">#{{ callerCase.id }}</span>
                     </h1>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-sm">
@@ -449,8 +438,11 @@ async function copyHandover() {
             >
                 <a href="#journey" class="whitespace-nowrap py-1">Call journey</a>
                 <a href="#caller" class="whitespace-nowrap py-1">1. Caller</a>
-                <a href="#safety" class="whitespace-nowrap py-1">2. Questions</a>
-                <a href="#handover" class="whitespace-nowrap py-1">3. Wrap up</a>
+                <a href="#call-type" class="whitespace-nowrap py-1">2. Call type</a>
+                <a href="#safety" class="whitespace-nowrap py-1">3. Questions</a>
+                <a v-if="showsQuestionnaire" href="#handover" class="whitespace-nowrap py-1"
+                    >4. Wrap up</a
+                >
             </nav>
         </header>
 
@@ -466,7 +458,7 @@ async function copyHandover() {
             be incomplete.
         </p>
         <aside
-            v-if="protocol && ['P1', 'P2'].includes(livePriority)"
+            v-if="protocol && showsQuestionnaire && ['P1', 'P2'].includes(livePriority)"
             role="alert"
             class="sticky top-32 z-10 space-y-2 rounded-xl border-2 border-red-600 bg-red-50 p-4 text-red-950 dark:bg-red-950 dark:text-red-100"
         >
@@ -483,7 +475,7 @@ async function copyHandover() {
             </p>
         </aside>
         <p v-if="callerCase.status === 'closed'" class="rounded-xl border p-4">
-            This case is closed. Saved answers and notes are read-only.
+            This case is closed. Saved answers are read-only.
         </p>
         <p v-if="!protocol" role="alert" class="rounded-xl border border-amber-500 p-4">
             No questionnaire is available. Contact an administrator before recording a screening.
@@ -514,6 +506,11 @@ async function copyHandover() {
             </div>
             <p v-else class="text-sm text-muted-foreground">No dentist transfer attempt recorded.</p>
             <p class="border-t pt-3 text-sm"><span class="font-medium">Case disposition:</span> {{ lifecycle.disposition ?? 'Not recorded yet' }}</p>
+            <p v-if="isClassified" class="text-sm">
+                <span class="font-medium">Call type:</span>
+                {{ contactKinds[callerCase.contact_kind] }} · confirmed
+                {{ formatClock(callerCase.contact_kind_confirmed_at) }}
+            </p>
         </section>
         <section id="caller" class="scroll-mt-36 space-y-4 rounded-xl border bg-card p-5">
             <h2 class="text-lg font-semibold">1. Who is calling?</h2>
@@ -581,31 +578,6 @@ async function copyHandover() {
                             />Guardian relationship confirmed using the approved process</label
                         >
                     </template>
-                    <details
-                        class="rounded-lg border p-3 sm:col-span-2"
-                        :open="profile.contact_kind !== 'genuine'"
-                    >
-                        <summary class="cursor-pointer text-sm font-medium">
-                            Contact type: {{ profile.contact_kind }} · change if needed
-                        </summary>
-                        <label class="mt-3 grid gap-2 text-sm"
-                            >Contact type<select v-model="profile.contact_kind" :class="inputClass">
-                                <option
-                                    v-for="kind in [
-                                        'genuine',
-                                        'unclear',
-                                        'abandoned',
-                                        'silent',
-                                        'nuisance',
-                                        'ultra_short',
-                                    ]"
-                                    :key="kind"
-                                >
-                                    {{ kind }}
-                                </option>
-                            </select></label
-                        >
-                    </details>
                     <template v-for="field in ['concern', 'onset', 'impact'] as const" :key="field">
                         <label
                             v-if="!hasSummaryQuestion(field)"
@@ -650,10 +622,166 @@ async function copyHandover() {
             </form>
         </section>
 
-        <section id="safety" class="scroll-mt-36 space-y-4 rounded-xl border bg-card p-5">
+        <section id="call-type" class="scroll-mt-36 space-y-4 rounded-xl border bg-card p-5">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold">2. Genuine or nuisance call?</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Decide this after the consent conversation. A genuine call continues to the
+                        questions form; a nuisance or prank call ends here and the questions are
+                        never asked.
+                    </p>
+                </div>
+                <span v-if="isClassified" class="rounded-full bg-muted px-3 py-1 text-sm">
+                    {{ contactKinds[callerCase.contact_kind] }}
+                </span>
+            </div>
+            <template v-if="isClassified && !isGenuine">
+                <p
+                    role="status"
+                    class="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100"
+                >
+                    This call was classified as “{{ contactKinds[callerCase.contact_kind] }}” and the
+                    case was closed as contact ended.
+                    <template v-if="!screenings.length"
+                        >No screening questionnaire was opened.</template
+                    >
+                </p>
+                <p
+                    v-if="callerCase.next_step"
+                    class="rounded-lg bg-muted p-3 text-sm whitespace-pre-wrap"
+                >
+                    {{ callerCase.next_step }}
+                </p>
+            </template>
+            <form v-if="canReclassify" @submit.prevent="classifyCall">
+                <fieldset :disabled="classification.processing" class="space-y-4">
+                    <div role="radiogroup" aria-label="Call type" class="grid gap-3 sm:grid-cols-2">
+                        <label class="cursor-pointer">
+                            <input
+                                v-model="classification.contact_kind"
+                                type="radio"
+                                name="call-type"
+                                value="genuine"
+                                class="peer sr-only"
+                            />
+                            <span
+                                class="block h-full rounded-lg border p-4 peer-checked:border-primary peer-checked:bg-primary/5 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary peer-disabled:cursor-not-allowed peer-disabled:opacity-60"
+                            >
+                                <span class="block font-medium">Genuine call</span>
+                                <span class="mt-1 block text-sm text-muted-foreground"
+                                    >Continue and ask the screening questions.</span
+                                >
+                            </span>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input
+                                v-model="classification.contact_kind"
+                                type="radio"
+                                name="call-type"
+                                value="nuisance"
+                                class="peer sr-only"
+                            />
+                            <span
+                                class="block h-full rounded-lg border p-4 peer-checked:border-red-600 peer-checked:bg-red-50 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-red-600 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 dark:peer-checked:bg-red-950"
+                            >
+                                <span class="block font-medium">Nuisance or prank call</span>
+                                <span class="mt-1 block text-sm text-muted-foreground"
+                                    >End the call now. The questions form does not open.</span
+                                >
+                            </span>
+                        </label>
+                    </div>
+                    <details class="rounded-lg border p-3">
+                        <summary class="cursor-pointer text-sm font-medium">
+                            Other non-genuine contact types
+                        </summary>
+                        <div
+                            role="radiogroup"
+                            aria-label="Other contact types"
+                            class="mt-3 flex flex-wrap gap-2"
+                        >
+                            <label
+                                v-for="kind in [
+                                    'unclear',
+                                    'abandoned',
+                                    'silent',
+                                    'ultra_short',
+                                ]"
+                                :key="kind"
+                                class="cursor-pointer"
+                            >
+                                <input
+                                    v-model="classification.contact_kind"
+                                    type="radio"
+                                    name="call-type"
+                                    :value="kind"
+                                    class="peer sr-only"
+                                />
+                                <span
+                                    class="flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary peer-disabled:cursor-not-allowed peer-disabled:opacity-60"
+                                    >{{ contactKinds[kind] }}</span
+                                >
+                            </label>
+                        </div>
+                    </details>
+                    <label v-if="endsCall" class="grid gap-1.5 text-sm font-medium">
+                        Why did the call end?
+                        <span class="font-normal text-muted-foreground"
+                            >Optional · saved with the case record</span
+                        >
+                        <textarea
+                            v-model="classification.note"
+                            rows="2"
+                            maxlength="500"
+                            :class="inputClass"
+                        ></textarea>
+                    </label>
+                    <p
+                        v-for="(error, key) in classification.errors"
+                        :key="key"
+                        role="alert"
+                        class="text-sm text-red-600"
+                    >
+                        {{ error }}
+                    </p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button
+                            type="submit"
+                            class="min-h-11 rounded-lg bg-primary px-5 py-2 font-medium text-primary-foreground"
+                            :disabled="
+                                !classification.contact_kind ||
+                                (isGenuine &&
+                                    classification.contact_kind === 'genuine' &&
+                                    callerCase.status !== 'closed')
+                            "
+                        >
+                            {{
+                                classification.processing ? "Saving…" : submitLabel
+                            }}
+                        </button>
+                        <span
+                            v-if="classification.recentlySuccessful"
+                            role="status"
+                            class="text-sm text-green-700 dark:text-green-400"
+                            >Call type saved</span
+                        >
+                    </div>
+                </fieldset>
+            </form>
+            <p v-else class="text-sm text-muted-foreground">
+                This case is closed. The call type can no longer be changed.
+            </p>
+        </section>
+
+        <section
+            v-if="showsQuestionnaire"
+            id="safety"
+            class="scroll-mt-36 space-y-4 rounded-xl border bg-card p-5"
+        >
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-lg font-semibold">2. Ask and record</h2>
+                    <h2 class="text-lg font-semibold">3. Ask and record</h2>
                     <p class="mt-1 text-sm text-muted-foreground">
                         Ask in order. Record what the caller says; use Unknown when offered.
                     </p>
@@ -662,9 +790,16 @@ async function copyHandover() {
                     {{ draftLabel }}
                 </p>
             </div>
+            <p
+                v-if="!isGenuine"
+                role="status"
+                class="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100"
+            >
+                Save the call type above as genuine to unlock the questions.
+            </p>
             <p class="text-sm text-muted-foreground">
                 Answers save as a draft while you type. Use “Save questionnaire” to record the
-                screen and update the handover.
+                screen and set the priority.
             </p>
             <p v-if="draftRecovered" role="status" class="rounded-lg bg-muted p-3 text-sm">
                 Recovered this browser’s draft. Check the answers against what the caller said.
@@ -694,7 +829,7 @@ async function copyHandover() {
             </button>
             <form @submit.prevent="saveConversation">
                 <fieldset
-                    :disabled="!canEdit || !protocol || safety.processing || profile.processing"
+                    :disabled="!canEdit || !protocol || !isGenuine || safety.processing || profile.processing"
                     class="space-y-5"
                 >
                     <div
@@ -833,17 +968,45 @@ async function copyHandover() {
                             v-if="safety.recentlySuccessful"
                             role="status"
                             class="text-sm text-green-700 dark:text-green-400"
-                            >Screen recorded · handover updated</span
+                            >Screen recorded</span
                         >
                     </div>
                 </fieldset>
             </form>
         </section>
 
-        <section id="handover" class="scroll-mt-36 space-y-4 rounded-xl border bg-card p-5">
-            <h2 class="text-lg font-semibold">3. Handover and finish</h2>
+        <section
+            v-else
+            id="safety"
+            class="scroll-mt-36 space-y-3 rounded-xl border border-dashed bg-card p-5"
+        >
+            <h2 class="text-lg font-semibold">3. Ask and record</h2>
+            <p
+                v-if="!isClassified && !classification.contact_kind && canReclassify"
+                class="text-sm text-muted-foreground"
+            >
+                Choose the call type above. The questions form opens only for a genuine call.
+            </p>
+            <p
+                v-else-if="!isClassified && !classification.contact_kind"
+                class="text-sm text-muted-foreground"
+            >
+                This case is closed and no call type was recorded, so no questions can be asked.
+            </p>
+            <p v-else class="text-sm text-muted-foreground">
+                This call is set to “{{ contactKinds[classification.contact_kind] }}”. The questions
+                form opens only for a genuine call.
+            </p>
+        </section>
+
+        <section
+            v-if="showsQuestionnaire"
+            id="handover"
+            class="scroll-mt-36 space-y-4 rounded-xl border bg-card p-5"
+        >
+            <h2 class="text-lg font-semibold">4. Handover and finish</h2>
             <p v-if="!screenings.length" class="text-sm text-muted-foreground">
-                Save the questionnaire to prepare the handover.
+                Save the questionnaire before recording an outcome.
             </p>
             <p
                 v-if="protocol && callerCase.priority"
@@ -854,58 +1017,6 @@ async function copyHandover() {
             <blockquote v-if="protocol && callerCase.priority === 'S'" class="border-l-4 pl-4">
                 {{ protocol.faq_answer }}
             </blockquote>
-            <details class="rounded-lg border p-3">
-                <summary class="cursor-pointer font-medium">Read handover summary</summary>
-                <pre class="my-3 font-sans text-sm whitespace-pre-wrap">{{ handover }}</pre>
-                <button type="button" class="min-h-11 rounded-lg border px-4" @click="copyHandover">
-                    Copy handover
-                </button>
-            </details>
-            <details
-                v-if="selectableDentists && callerCase.priority !== 'P1'"
-                class="rounded-lg border p-3"
-            >
-                <summary class="cursor-pointer font-medium">Find a dentist</summary>
-                <p class="my-3 text-sm text-muted-foreground">
-                    Confirm availability and use Jitsi for the private briefing and transfer.
-                </p>
-                <p v-if="!selectableDentists.dentists.length" class="text-sm">
-                    No approved transfer numbers are available.
-                </p>
-                <ul class="grid gap-3 sm:grid-cols-2">
-                    <li
-                        v-for="dentist in selectableDentists.dentists"
-                        :key="dentist.id"
-                        class="rounded-lg bg-muted p-3 text-sm"
-                    >
-                        <p class="font-medium">
-                            {{ dentist.name }}
-                            <span :class="availabilityClass(dentist.availability_status)"
-                                >· {{ dentist.availability_status }}</span
-                            >
-                        </p>
-                        <p v-if="dentist.availability_until" class="text-xs text-muted-foreground">
-                            Until {{ formatClock(dentist.availability_until) }}
-                        </p>
-                        <p v-for="number in dentist.numbers" :key="number.id" class="font-mono">
-                            {{ number.masked }} · {{ number.label }}
-                        </p>
-                    </li>
-                </ul>
-                <Link :href="dentists()" class="mt-3 inline-block text-sm underline"
-                    >Open dentist directory</Link
-                >
-            </details>
-            <details class="rounded-lg border p-3">
-                <summary class="cursor-pointer text-sm font-medium">Browser call controls</summary>
-                <CallControls
-                    :case-id="callerCase.id"
-                    :allowed="canControl"
-                    :closed="callerCase.status === 'closed'"
-                    :emergency="livePriority === 'P1'"
-                    :dentists="selectableDentists?.dentists ?? []"
-                />
-            </details>
             <form @submit.prevent="closeCase">
                 <fieldset :disabled="!canEdit || !protocol || closure.processing" class="space-y-4">
                     <label class="grid gap-1.5 text-sm font-medium"
@@ -977,121 +1088,5 @@ async function copyHandover() {
                 </fieldset>
             </form>
         </section>
-        <details class="rounded-xl border bg-card p-5">
-            <summary class="cursor-pointer font-medium">
-                Additional notes
-                <span class="text-sm text-muted-foreground">({{ notes.length }})</span>
-            </summary>
-            <form class="mt-4" @submit.prevent="saveNote">
-                <fieldset :disabled="!canEdit || note.processing" class="space-y-3">
-                    <label class="grid gap-2 text-sm"
-                        >Reported fact or action<textarea
-                            v-model="note.body"
-                            required
-                            maxlength="2000"
-                            rows="3"
-                            :class="inputClass"
-                        ></textarea>
-                    </label>
-                    <p
-                        v-for="(error, key) in note.errors"
-                        :key="key"
-                        role="alert"
-                        class="text-sm text-red-600"
-                    >
-                        {{ error }}
-                    </p>
-                    <button class="min-h-11 rounded-lg border px-4">Add note</button>
-                </fieldset>
-            </form>
-            <article v-for="item in notes" :key="item.id" class="mt-3 border-t pt-3">
-                <p class="text-xs text-muted-foreground">
-                    {{ formatClock(item.created_at) }} · operator #{{ item.recorded_by }}
-                </p>
-                <p class="whitespace-pre-wrap">{{ item.body }}</p>
-            </article>
-        </details>
-        <details id="call" class="rounded-xl border bg-card p-5">
-            <summary class="cursor-pointer font-medium">Call details and connection</summary>
-            <dl v-if="callContext.interaction" class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <div>
-                    <dt class="text-muted-foreground">Caller number</dt>
-                    <dd>{{ callContext.interaction.caller_number ?? "Not supplied by PBX" }}</dd>
-                </div>
-                <div>
-                    <dt class="text-muted-foreground">Inbound line</dt>
-                    <dd>{{ callContext.interaction.inbound_did ?? "Not supplied by PBX" }}</dd>
-                </div>
-                <div>
-                    <dt class="text-muted-foreground">Arrived</dt>
-                    <dd>{{ formatClock(callContext.interaction.started_at) }}</dd>
-                </div>
-                <div>
-                    <dt class="text-muted-foreground">PBX state</dt>
-                    <dd>
-                        {{ stageLabel(callContext.interaction.stage) }} ·
-                        {{ callContext.interaction.exceptions }} evidence issues
-                    </dd>
-                </div>
-                <div>
-                    <dt class="text-muted-foreground">Agent channel</dt>
-                    <dd>
-                        {{ callContext.interaction.agent_channel ?? "Unknown" }} · extension
-                        {{ callContext.agent_extension }}
-                    </dd>
-                </div>
-                <div>
-                    <dt class="text-muted-foreground">Heartbeat</dt>
-                    <dd>{{ formatSeconds(callContext.freshness.heartbeat_age_seconds) }} ago</dd>
-                </div>
-            </dl>
-            <p class="mt-3 text-xs text-muted-foreground">
-                Associated by operator #{{ callerCase.association_verified_by }} · owner #{{
-                    callerCase.assigned_to
-                }}. Refreshed {{ formatClock(callContext.generated_at) }}.
-            </p>
-            <button
-                v-if="canEdit"
-                type="button"
-                class="mt-3 min-h-11 rounded-lg border px-4 text-sm"
-                @click="toggleEvidence"
-            >
-                {{ liveEvidence ? "Pause call evidence" : "Resume call evidence" }}
-            </button>
-        </details>
-        <details id="history" class="space-y-4 rounded-xl border bg-card p-5">
-            <summary class="cursor-pointer font-medium">Saved answers and record history</summary>
-            <details v-for="screen in screenings" :key="screen.id" class="rounded border p-3">
-                <summary>
-                    {{ screen.completed_at }} · {{ screen.priority }} ·
-                    {{ screen.complete ? "complete" : "incomplete / unknown" }}
-                    · protocol #{{ screen.screening_protocol_id }} · operator #{{
-                        screen.recorded_by
-                    }}
-                </summary>
-                <ul class="mt-3 grid gap-2">
-                    <li v-for="answer in screen.answers" :key="answer.screening_question_id">
-                        {{
-                            answer.question_prompt ??
-                            historyProtocols
-                                .find((p) => p.id === screen.screening_protocol_id)
-                                ?.questions.find((q) => q.id === answer.screening_question_id)
-                                ?.prompt
-                        }}
-                        — {{ answer.answer || "(no answer)" }}
-                        <span class="text-xs text-muted-foreground">
-                            · {{ answer.answer_status ?? "answered" }} · v{{
-                                answer.question_version ?? "—"
-                            }}
-                            · operator #{{ answer.recorded_by ?? "—" }} ·
-                            {{ formatClock(answer.saved_at) }}
-                        </span>
-                    </li>
-                </ul>
-            </details>
-            <p v-if="!screenings.length" class="text-sm text-muted-foreground">
-                No screening recorded.
-            </p>
-        </details>
     </div>
 </template>
