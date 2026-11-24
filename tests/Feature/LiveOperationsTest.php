@@ -81,6 +81,8 @@ test('live operations routes require authentication and the PBX permission', fun
             ->where('refreshSeconds', 3)
             ->where('refreshBounds', ['min' => LiveOperationsSnapshot::MIN_REFRESH_SECONDS, 'max' => LiveOperationsSnapshot::MAX_REFRESH_SECONDS])
             ->where('canAcknowledge', false)
+            ->where('canSavePreferences', true)
+            ->where('canOpenLiveDetails', true)
             ->has('filters.from')
             ->has('filters.state'));
 });
@@ -98,14 +100,22 @@ test('every role reads the operations overview without the PBX permission', func
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Dashboard')
             ->where('canViewOverview', true)
-            ->where('canOpenConsole', false));
+            ->where('canOpenConsole', true)
+            ->where('canViewLiveDetails', false));
 
     $this->getJson(route('exp.live'))
         ->assertOk()
         ->assertJsonPath('kpis.inbound', 0);
 
-    // The deeper console screens stay behind `view pbx`.
-    $this->get(route('exp.dashboard'))->assertForbidden();
+    // The overview screen itself is read-only for a role without `view pbx`;
+    // the deeper live-operations pages stay behind that permission.
+    $this->get(route('exp.dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Exp/Dashboard')
+            ->where('canSavePreferences', false)
+            ->where('canOpenLiveDetails', false));
+
     $this->get(route('live-operations.active-calls'))->assertForbidden();
     $this->get(route('live-operations.transfers'))->assertForbidden();
     $this->get(route('live-operations.alerts'))->assertForbidden();
@@ -119,7 +129,8 @@ test('PBX operators keep the live console link on the dashboard overview', funct
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Dashboard')
             ->where('canViewOverview', true)
-            ->where('canOpenConsole', true));
+            ->where('canOpenConsole', true)
+            ->where('canViewLiveDetails', true));
 });
 
 test('the dashboard withholds the overview from an account without a role', function () {
@@ -130,7 +141,8 @@ test('the dashboard withholds the overview from an account without a role', func
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Dashboard')
             ->where('canViewOverview', false)
-            ->where('canOpenConsole', false));
+            ->where('canOpenConsole', false)
+            ->where('canViewLiveDetails', false));
 
     $this->getJson(route('exp.live'))->assertForbidden();
 });

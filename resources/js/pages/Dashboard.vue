@@ -35,12 +35,14 @@ const paused = ref(false);
 
 /**
  * The overview is rendered for every role (`view operations overview`), so the
- * controller decides both flags: the overview data itself, and whether the
- * deeper live console — still guarded by `view pbx` — can be opened.
+ * controller decides all three flags: the overview data itself, whether the
+ * read-only console can be opened, and whether the deeper live-operations
+ * pages — still guarded by `view pbx` — are reachable.
  */
 const props = defineProps<{
     canViewOverview: boolean;
     canOpenConsole: boolean;
+    canViewLiveDetails: boolean;
 }>();
 
 const overviewEnabled = computed<boolean>(() => props.canViewOverview);
@@ -215,7 +217,7 @@ const kpis = computed(() => [
                             </p>
                         </div>
                         <Link
-                            v-if="canOpenConsole"
+                            v-if="canViewLiveDetails"
                             :href="liveActiveCalls()"
                             class="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
                             >View all</Link

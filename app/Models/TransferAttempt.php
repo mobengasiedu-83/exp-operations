@@ -25,6 +25,13 @@ class TransferAttempt extends Model
     /** @use HasFactory<TransferAttemptFactory> */
     use HasFactory;
 
+    /**
+     * The attempt mirrors microsecond call-leg timestamps, so the column format
+     * must keep them; without it every derived duration loses the sub-second
+     * remainder the projector measured.
+     */
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     public const STATUSES = ['dialling', 'ringing', 'network_answered', 'unanswered', 'busy', 'cancelled', 'failed', 'transfer_failed', 'voicemail', 'declined', 'accepted', 'consultation_observed', 'completed'];
 
     public const MATCH_STATUSES = ['approved', 'pending', 'unknown'];

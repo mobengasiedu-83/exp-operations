@@ -19,6 +19,7 @@ use App\Http\Controllers\AgentWorkspaceController;
 use App\Http\Controllers\CallbackController;
 use App\Http\Controllers\CallControlController;
 use App\Http\Controllers\CallJourneyController;
+use App\Http\Controllers\CallTimeController;
 use App\Http\Controllers\CorrelationExceptionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DentistController;
@@ -152,6 +153,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('reports/{report}', [ReportController::class, 'show'])->name('reports.show');
     Route::post('reports/{report}/runs', [ReportController::class, 'store'])->name('reports.store');
     Route::get('reports/{report}/export', [ReportController::class, 'export'])->name('reports.export');
+
+    // Call time: total, wait, agent and dentist time, gated by `view call time`
+    // so a read-only role can study timing without opening PBX telemetry tools.
+    Route::prefix('call-time')->name('call-time.')->group(function () {
+        Route::get('/', [CallTimeController::class, 'overview'])->name('overview');
+        Route::get('agents', [CallTimeController::class, 'agents'])->name('agents');
+        Route::get('dentists', [CallTimeController::class, 'dentists'])->name('dentists');
+    });
 
     // Dentist directory and rostering routes (Phase 5)
     Route::prefix('dentists')->name('dentists.')->group(function () {

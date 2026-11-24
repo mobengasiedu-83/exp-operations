@@ -23,7 +23,8 @@ class DashboardController extends Controller
 
         return Inertia::render('Dashboard', [
             'canViewOverview' => $user->canAny(['view operations overview', 'view pbx']),
-            'canOpenConsole' => $user->can('view pbx'),
+            'canOpenConsole' => $user->canAny(['view operations overview', 'view pbx']),
+            'canViewLiveDetails' => $user->can('view pbx'),
         ]);
     }
 }

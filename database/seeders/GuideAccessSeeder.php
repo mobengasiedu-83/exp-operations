@@ -32,7 +32,7 @@ class GuideAccessSeeder extends Seeder
         // Viewer keeps: it renders the dashboard overview read-only. `view pbx`
         // still stays away from the role because it also reveals the live
         // console, PBX telemetry tools and the administration hub.
-        $viewerPermissions = ['view call history', 'view all cases', 'view reports', 'view dentists', 'view operations overview'];
+        $viewerPermissions = ['view call history', 'view all cases', 'view reports', 'view dentists', 'view operations overview', 'view call time'];
 
         foreach ($viewerPermissions as $permission) {
             Permission::findOrCreate($permission, 'web');

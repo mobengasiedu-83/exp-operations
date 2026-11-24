@@ -30,6 +30,8 @@ const props = defineProps<{
     refreshBounds: { min: number; max: number };
     filters: LiveFilters;
     canAcknowledge: boolean;
+    canSavePreferences: boolean;
+    canOpenLiveDetails: boolean;
 }>();
 
 const filters = ref<LiveFilters>({ ...props.filters });
@@ -86,6 +88,10 @@ function clearFilters() {
 }
 
 function saveView() {
+    if (!props.canSavePreferences) {
+        return;
+    }
+
     saving.value = true;
     router.patch(
         preferences.url(),
@@ -220,6 +226,7 @@ function acknowledge(id: number) {
                             {{ loading ? 'Refreshing…' : 'Refresh now' }}
                         </button>
                         <button
+                            v-if="canSavePreferences"
                             type="button"
                             class="rounded bg-emerald-700 px-3 py-1.5 font-semibold text-white"
                             :disabled="saving"
@@ -325,6 +332,7 @@ function acknowledge(id: number) {
                     <div class="flex items-center justify-between gap-3">
                         <h2 class="font-semibold">Active calls</h2>
                         <Link
+                            v-if="canOpenLiveDetails"
                             :href="activeCallsPage.url({ query: filters })"
                             class="text-sm text-emerald-700"
                             >Open active calls →</Link
@@ -394,7 +402,10 @@ function acknowledge(id: number) {
                 >
                     <div class="flex items-center justify-between gap-3">
                         <h2 class="font-semibold">Alerts</h2>
-                        <Link :href="alertsPage.url()" class="text-sm text-emerald-700"
+                        <Link
+                            v-if="canOpenLiveDetails"
+                            :href="alertsPage.url()"
+                            class="text-sm text-emerald-700"
                             >All alerts →</Link
                         >
                     </div>
@@ -460,7 +471,10 @@ function acknowledge(id: number) {
                             ringing and answer timings in seconds.
                         </p>
                     </div>
-                    <Link :href="transfersPage.url({ query: filters })" class="text-sm text-emerald-700"
+                    <Link
+                        v-if="canOpenLiveDetails"
+                        :href="transfersPage.url({ query: filters })"
+                        class="text-sm text-emerald-700"
                         >Open transfers →</Link
                     >
                 </div>

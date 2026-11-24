@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import type { Component } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
+    Activity,
     BookOpen,
     ChartColumn,
     ChevronDown,
@@ -16,6 +17,8 @@ import {
     Settings,
     ShieldCheck,
     Stethoscope,
+    Timer,
+    Users,
 } from '@lucide/vue';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 
@@ -24,11 +27,14 @@ type PrimaryMenu = NavEntry & { children: NavEntry[] };
 
 const icons: Record<string, Component> = {
     'layout-dashboard': LayoutDashboard,
+    activity: Activity,
     headphones: Headphones,
     phone: Phone,
     inbox: Inbox,
     route: RouteIcon,
     list: List,
+    timer: Timer,
+    users: Users,
     'chart-column': ChartColumn,
     stethoscope: Stethoscope,
     settings: Settings,

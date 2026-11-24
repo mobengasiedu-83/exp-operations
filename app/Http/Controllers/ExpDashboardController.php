@@ -20,8 +20,12 @@ class ExpDashboardController extends Controller
 {
     public function index(Request $request): Response
     {
-        $this->authorize('view pbx');
+        // The overview is the read-only picture every role may open, so a
+        // Viewer or Agent reaches it without `view pbx`. The deeper live pages
+        // (active calls, transfers, alerts) and the saved-view preferences
+        // still need `view pbx`.
         $user = $this->user($request);
+        abort_unless($user->canAny(['view pbx', 'view operations overview']), 403);
         $preference = DashboardPreference::query()->where('user_id', $user->id)->first();
 
         return Inertia::render('Exp/Dashboard', [
@@ -29,6 +33,8 @@ class ExpDashboardController extends Controller
             'refreshBounds' => ['min' => LiveOperationsSnapshot::MIN_REFRESH_SECONDS, 'max' => LiveOperationsSnapshot::MAX_REFRESH_SECONDS],
             'filters' => array_merge(['from' => '', 'to' => '', 'agent' => '', 'destination' => '', 'state' => ''], (array) ($preference->filters ?? [])),
             'canAcknowledge' => $user->can('edit settings'),
+            'canSavePreferences' => $user->can('view pbx'),
+            'canOpenLiveDetails' => $user->can('view pbx'),
         ]);
     }
 

@@ -50,6 +50,8 @@ class DatabaseSeeder extends Seeder
             'view call history',
             'export call history',
             'control calls',
+            // Call time (total, wait, agent and dentist timing)
+            'view call time',
             // Operational reports (Phase 6)
             'view reports',
             'view executive reports',
@@ -186,6 +188,13 @@ class DatabaseSeeder extends Seeder
         $operationsOverview = Permission::findOrCreate('view operations overview', 'web');
         foreach (array_keys($roleDefinitions) as $roleName) {
             Role::findOrCreate($roleName, 'web')->givePermissionTo($operationsOverview);
+        }
+
+        // Call time is the second read-only report every role may open: total,
+        // wait, agent and dentist time measured from retained call evidence.
+        $callTime = Permission::findOrCreate('view call time', 'web');
+        foreach (array_keys($roleDefinitions) as $roleName) {
+            Role::findOrCreate($roleName, 'web')->givePermissionTo($callTime);
         }
 
         // Seed service hours

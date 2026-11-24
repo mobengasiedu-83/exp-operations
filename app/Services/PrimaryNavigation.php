@@ -33,6 +33,7 @@ class PrimaryNavigation
         /** @var list<array{key: string, title: string, href: string, icon: string, visible: bool, children?: list<array{key: string, title: string, href: string, icon: string, visible: bool}>}> $menus */
         $menus = [
             ['key' => 'dashboard', 'title' => 'Dashboard', 'href' => route('dashboard'), 'icon' => 'layout-dashboard', 'visible' => true],
+            ['key' => 'operations', 'title' => 'Operations overview', 'href' => route('exp.dashboard'), 'icon' => 'activity', 'visible' => $user->can('view operations overview')],
             ['key' => 'workspace', 'title' => 'Agent Workspace', 'href' => route('workspace.index'), 'icon' => 'headphones', 'visible' => $user->can('view cases')],
             [
                 'key' => 'call-history', 'title' => 'Calls', 'href' => route('calls.index'), 'icon' => 'phone', 'visible' => $canReadCalls,
@@ -40,6 +41,14 @@ class PrimaryNavigation
                     ['key' => 'agent-calls', 'title' => 'Agent calls', 'href' => route('calls.agent'), 'icon' => 'inbox', 'visible' => $user->canAny(['view call history', 'view cases'])],
                     ['key' => 'did-calls', 'title' => 'DID journeys', 'href' => route('calls.did'), 'icon' => 'route', 'visible' => $canReadCalls],
                     ['key' => 'all-calls', 'title' => 'All calls', 'href' => route('calls.index'), 'icon' => 'list', 'visible' => $canReadCalls],
+                ],
+            ],
+            [
+                'key' => 'call-time', 'title' => 'Call time', 'href' => route('call-time.overview'), 'icon' => 'timer', 'visible' => $user->can('view call time'),
+                'children' => [
+                    ['key' => 'call-time-overview', 'title' => 'Overview', 'href' => route('call-time.overview'), 'icon' => 'timer', 'visible' => $user->can('view call time')],
+                    ['key' => 'call-time-agents', 'title' => 'By agent', 'href' => route('call-time.agents'), 'icon' => 'users', 'visible' => $user->can('view call time')],
+                    ['key' => 'call-time-dentists', 'title' => 'By dentist', 'href' => route('call-time.dentists'), 'icon' => 'stethoscope', 'visible' => $user->can('view call time')],
                 ],
             ],
             ['key' => 'reports', 'title' => 'Reports', 'href' => route('reports.index'), 'icon' => 'chart-column', 'visible' => $user->can('view reports')],
