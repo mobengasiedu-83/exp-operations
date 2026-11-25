@@ -54,9 +54,12 @@ test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 git --no-pager log -1 --oneline
 php artisan config:clear
 
-rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
+# --no-dev deletes laravel/boost, so drop every discovery/cache manifest that was
+# generated while it was installed (packages.php, services.php and any cached
+# routes pointing at /_boost/*). Otherwise artisan aborts with
+# `Class "Laravel\Boost\BoostServiceProvider" not found`.
+rm -f bootstrap/cache/*.php
 COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-# Expose the underlying error directly before attempting the frontend build.
 php artisan wayfinder:generate --with-form
 umask 022
 npm ci --include=dev --no-audit --no-fund
@@ -90,7 +93,9 @@ git --no-pager log -1 --oneline
 DEPLOY_COMMANDS
 ```
 
-The underlying Wayfinder error is now known: `In Native.php line 202: Class "Laravel\Boost\BoostServiceProvider" not found`. `bootstrap/cache/packages.php` and `bootstrap/cache/services.php` were generated while the dev dependency `laravel/boost` was installed; `composer install --no-dev` deletes the package but leaves those manifests, so the next `artisan` call cannot boot. Delete both files and re-run `composer install --no-dev` (step 4 above). If generation still fails, share that command's error output and keep the application in maintenance mode until repaired. If the block stops after `php artisan up`, return to maintenance mode if the verification failure affects service, and follow the recovery guide. Successful HTTP checks still require the email and PBX checks in section 6.
+The `laravel/boost` failure mode is now confirmed on production (24 Nov 2026): `In Native.php line 202: Class "Laravel\Boost\BoostServiceProvider" not found`. `bootstrap/cache/packages.php`, `bootstrap/cache/services.php` and `bootstrap/cache/routes-v7.php` were generated while the dev dependency `laravel/boost` was installed; `composer install --no-dev` deletes the package but leaves those files, so the next `artisan` call cannot boot and, if the run aborts at that point, the site stays in maintenance mode with services stopped. `rm -f bootstrap/cache/*.php` before `composer install --no-dev` prevents it. If generation still fails, share that command's error output and keep the application in maintenance mode until repaired. If the block stops after `php artisan up`, return to maintenance mode if the verification failure affects service, and follow the recovery guide. Successful HTTP checks still require the email and PBX checks in section 6.
+
+If SSH stops answering partway through a run while `http://10.10.20.51:8086/up` still responds, the host's firewall is rate-limiting the client address (repeat `ssh`/`scp` connections inside a minute are enough). Wait a few minutes and reconnect; do not assume the server rebooted, and do not start a second deploy in the meantime. If the console is reachable, clear the block with `fail2ban-client set sshd unbanip <client-ip>`.
 
 The sections below describe the normal deployment stages. Do not continue by pasting later sections after this recovery block reports a failure.
 
@@ -146,10 +151,11 @@ If required, update the existing production `.env` privately. Preserve `APP_KEY`
 ## 4. Install dependencies, build, and migrate
 
 ```bash
-# `--no-dev` removes laravel/boost, so delete discovery manifests that were
-# generated while it was installed. Otherwise every artisan command aborts with
+# `--no-dev` removes laravel/boost, so delete every cached manifest that was
+# generated while it was installed - packages.php, services.php and any cached
+# routes holding /_boost/* entries. Otherwise every artisan command aborts with
 # `Class "Laravel\Boost\BoostServiceProvider" not found`.
-rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
+rm -f bootstrap/cache/*.php
 COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 php artisan wayfinder:generate --with-form
 umask 022
