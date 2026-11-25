@@ -44,33 +44,54 @@ class CallTimeAnalytics
     public function __construct(private readonly ?CarbonImmutable $now = null) {}
 
     /**
-     * The rolling window the pages report on.
+     * Resolve the window the pages report on.
      *
-     * @return array{days: int, from: CarbonImmutable, to: CarbonImmutable, from_iso: string, to_iso: string}
+     * Without a date range this is the rolling day count the page offers. A
+     * `from`/`to` pair is read as inclusive calendar days so a manager can ask
+     * for one day, one month or one shift; only one end is required, so "from
+     * 1 November" runs to now and "up to 31 October" covers the year before it.
+     *
+     * Dates are parsed in the application timezone and `to` is stored as the
+     * start of the following day, so every query can compare instants
+     * (`started_at < to`) instead of wrapping the column in `DATE()`, which
+     * would stop the index being used.
+     *
+     * @return array{days: int, range: bool, from: CarbonImmutable, to: CarbonImmutable, from_iso: string, to_iso: string, from_date: string, to_date: string}
      */
-    public function window(int $days): array
+    public function window(int $days, ?string $from = null, ?string $to = null): array
     {
-        $windowDays = max(1, min($days, self::MAX_DAYS));
-        $to = $this->now();
-        $from = $to->subDays($windowDays);
+        $range = $from !== null || $to !== null;
+
+        if (! $range) {
+            $windowDays = max(1, min($days, self::MAX_DAYS));
+            $to = $this->now();
+            $from = $to->subDays($windowDays);
+        } else {
+            $to = $to !== null ? $this->day($to)->addDay() : $this->now();
+            $from = $from !== null ? $this->day($from) : $to->subDays(self::MAX_DAYS);
+            $windowDays = max(1, (int) ceil($from->diffInSeconds($to) / 86400));
+        }
 
         return [
             'days' => $windowDays,
+            'range' => $range,
             'from' => $from,
             'to' => $to,
             'from_iso' => $from->toIso8601String(),
             'to_iso' => $to->toIso8601String(),
+            'from_date' => $from->toDateString(),
+            'to_date' => $to->subSecond()->toDateString(),
         ];
     }
 
     /**
      * Totals, averages and a per-day trend for the overview screen.
      *
+     * @param  array{days: int, range: bool, from: CarbonImmutable, to: CarbonImmutable, from_iso: string, to_iso: string, from_date: string, to_date: string}  $window
      * @return array<string, mixed>
      */
-    public function overview(int $days): array
+    public function overview(array $window): array
     {
-        $window = $this->window($days);
         $timings = $this->timings($window['from'], $window['to']);
 
         return [
@@ -114,11 +135,11 @@ class CallTimeAnalytics
     /**
      * Talk time grouped by the PBX extension that handled the call.
      *
+     * @param  array{days: int, range: bool, from: CarbonImmutable, to: CarbonImmutable, from_iso: string, to_iso: string, from_date: string, to_date: string}  $window
      * @return array<string, mixed>
      */
-    public function agents(int $days): array
+    public function agents(array $window): array
     {
-        $window = $this->window($days);
         $timings = $this->timings($window['from'], $window['to']);
 
         /** @var array<string, array<string, mixed>> $rows */
@@ -202,12 +223,11 @@ class CallTimeAnalytics
      * fingerprints the dialled number. An attempt that never matched a
      * directory number is kept so the page shows how much time is unattributed.
      *
+     * @param  array{days: int, range: bool, from: CarbonImmutable, to: CarbonImmutable, from_iso: string, to_iso: string, from_date: string, to_date: string}  $window
      * @return array<string, mixed>
      */
-    public function dentists(int $days): array
+    public function dentists(array $window): array
     {
-        $window = $this->window($days);
-
         $attempts = TransferAttempt::query()
             ->whereNotNull('dial_started_at')
             ->where('dial_started_at', '>=', $window['from'])
@@ -462,15 +482,27 @@ class CallTimeAnalytics
     }
 
     /**
-     * @param  array{days: int, from: CarbonImmutable, to: CarbonImmutable, from_iso: string, to_iso: string}  $window
-     * @return array{days: int, from: string, to: string}
+     * A calendar day in the application timezone, e.g. the `from`/`to` query
+     * string of a date input.
+     */
+    private function day(string $date): CarbonImmutable
+    {
+        return CarbonImmutable::parse($date, config('app.timezone'))->startOfDay();
+    }
+
+    /**
+     * @param  array{days: int, range: bool, from: CarbonImmutable, to: CarbonImmutable, from_iso: string, to_iso: string, from_date: string, to_date: string}  $window
+     * @return array{days: int, range: bool, from: string, to: string, from_date: string, to_date: string}
      */
     private function serialiseWindow(array $window): array
     {
         return [
             'days' => $window['days'],
+            'range' => $window['range'],
             'from' => $window['from_iso'],
             'to' => $window['to_iso'],
+            'from_date' => $window['from_date'],
+            'to_date' => $window['to_date'],
         ];
     }
 }

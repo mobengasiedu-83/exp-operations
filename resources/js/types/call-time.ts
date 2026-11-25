@@ -1,7 +1,17 @@
 export type CallTimeWindow = {
     days: number;
+    range: boolean;
     from: string;
     to: string;
+    from_date: string;
+    to_date: string;
+};
+
+/** The query-string filters the pages accept; `from`/`to` win over `days`. */
+export type CallTimeFilters = {
+    days: number;
+    from: string | null;
+    to: string | null;
 };
 
 export type CallTimeTotals = {

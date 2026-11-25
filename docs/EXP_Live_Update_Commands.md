@@ -54,6 +54,7 @@ test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 git --no-pager log -1 --oneline
 php artisan config:clear
 
+rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
 COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 # Expose the underlying error directly before attempting the frontend build.
 php artisan wayfinder:generate --with-form
@@ -89,7 +90,7 @@ git --no-pager log -1 --oneline
 DEPLOY_COMMANDS
 ```
 
-The underlying Wayfinder error has not yet been provided, so this block diagnoses it rather than assuming a cause. If generation fails, share that command's error output and keep the application in maintenance mode until repaired. If the block stops after `php artisan up`, return to maintenance mode if the verification failure affects service, and follow the recovery guide. Successful HTTP checks still require the email and PBX checks in section 6.
+The underlying Wayfinder error is now known: `In Native.php line 202: Class "Laravel\Boost\BoostServiceProvider" not found`. `bootstrap/cache/packages.php` and `bootstrap/cache/services.php` were generated while the dev dependency `laravel/boost` was installed; `composer install --no-dev` deletes the package but leaves those manifests, so the next `artisan` call cannot boot. Delete both files and re-run `composer install --no-dev` (step 4 above). If generation still fails, share that command's error output and keep the application in maintenance mode until repaired. If the block stops after `php artisan up`, return to maintenance mode if the verification failure affects service, and follow the recovery guide. Successful HTTP checks still require the email and PBX checks in section 6.
 
 The sections below describe the normal deployment stages. Do not continue by pasting later sections after this recovery block reports a failure.
 
@@ -145,7 +146,12 @@ If required, update the existing production `.env` privately. Preserve `APP_KEY`
 ## 4. Install dependencies, build, and migrate
 
 ```bash
+# `--no-dev` removes laravel/boost, so delete discovery manifests that were
+# generated while it was installed. Otherwise every artisan command aborts with
+# `Class "Laravel\Boost\BoostServiceProvider" not found`.
+rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
 COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+php artisan wayfinder:generate --with-form
 umask 022
 npm ci --include=dev --no-audit --no-fund
 npm run build

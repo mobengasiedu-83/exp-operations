@@ -5,6 +5,8 @@
  * time and a dentist's connected time can all be summed without rounding
  * drift. These helpers only change how the total is printed.
  */
+import type { CallTimeWindow, CallTimeFilters } from '@/types/call-time';
+
 export function formatTime(seconds: number | null | undefined): string {
     if (seconds === null || seconds === undefined) {
         return '—';
@@ -42,4 +44,40 @@ export function formatDay(date: string): string {
 /** Share of the window's total call time, used by the stage breakdown. */
 export function share(value: number, total: number): number {
     return total <= 0 ? 0 : Math.min(100, (value / total) * 100);
+}
+
+/**
+ * The query that reproduces the measured window on another Call time page, so
+ * jumping from a November overview to "By agent" keeps November instead of
+ * silently resetting to the default rolling window.
+ */
+export function windowQuery(filters: CallTimeFilters): Record<string, string> {
+    if (!filters.from && !filters.to) {
+        return { days: String(filters.days) };
+    }
+
+    const range: Record<string, string> = {};
+
+    if (filters.from) {
+        range.from = filters.from;
+    }
+
+    if (filters.to) {
+        range.to = filters.to;
+    }
+
+    return range;
+}
+
+/**
+ * The window a page actually measured, printed as the calendar days it covers.
+ *
+ * The server resolves an explicit date range to whole days, so the first and
+ * last day are inclusive — a single day prints once instead of as a range.
+ */
+export function formatWindow(window: CallTimeWindow): string {
+    const from = formatDay(window.from_date);
+    const to = formatDay(window.to_date);
+
+    return from === to ? from : `${from} – ${to}`;
 }

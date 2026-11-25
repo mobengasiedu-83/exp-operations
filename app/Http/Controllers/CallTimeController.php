@@ -23,46 +23,72 @@ class CallTimeController extends Controller
 
     public function overview(Request $request, CallTimeAnalytics $analytics): Response
     {
-        $days = $this->days($request);
+        $filters = $this->filters($request);
 
         return Inertia::render('CallTime/Overview', [
-            'overview' => $analytics->overview($days),
-            'filters' => ['days' => $days],
+            'overview' => $analytics->overview($this->window($analytics, $filters)),
+            'filters' => $filters,
             'windows' => self::WINDOWS,
         ]);
     }
 
     public function agents(Request $request, CallTimeAnalytics $analytics): Response
     {
-        $days = $this->days($request);
+        $filters = $this->filters($request);
 
         return Inertia::render('CallTime/Agents', [
-            'agents' => $analytics->agents($days),
-            'filters' => ['days' => $days],
+            'agents' => $analytics->agents($this->window($analytics, $filters)),
+            'filters' => $filters,
             'windows' => self::WINDOWS,
         ]);
     }
 
     public function dentists(Request $request, CallTimeAnalytics $analytics): Response
     {
-        $days = $this->days($request);
+        $filters = $this->filters($request);
 
         return Inertia::render('CallTime/Dentists', [
-            'dentists' => $analytics->dentists($days),
-            'filters' => ['days' => $days],
+            'dentists' => $analytics->dentists($this->window($analytics, $filters)),
+            'filters' => $filters,
             'windows' => self::WINDOWS,
         ]);
     }
 
-    /** Validate the window and gate the whole menu behind `view call time`. */
-    private function days(Request $request): int
+    /**
+     * Validate the window and gate the whole menu behind `view call time`.
+     *
+     * `days` is the rolling window the page offers. `from`/`to` are inclusive
+     * calendar days (a single day, a month, a quarter); either end may be sent
+     * on its own, and a supplied range takes precedence over the day count.
+     *
+     * @return array{days: int, from: string|null, to: string|null}
+     */
+    private function filters(Request $request): array
     {
         $this->authorize('view call time');
 
         $validated = $request->validate([
             'days' => ['nullable', 'integer', Rule::in(self::WINDOWS)],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
 
-        return (int) ($validated['days'] ?? CallTimeAnalytics::DEFAULT_DAYS);
+        return [
+            'days' => (int) ($validated['days'] ?? CallTimeAnalytics::DEFAULT_DAYS),
+            'from' => $validated['from'] ?? null,
+            'to' => $validated['to'] ?? null,
+        ];
+    }
+
+    /**
+     * Resolve the filters into the window {@see CallTimeAnalytics::window()}
+     * expects.
+     *
+     * @param  array{days: int, from: string|null, to: string|null}  $filters
+     * @return array<string, mixed>
+     */
+    private function window(CallTimeAnalytics $analytics, array $filters): array
+    {
+        return $analytics->window($filters['days'], $filters['from'], $filters['to']);
     }
 }

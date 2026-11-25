@@ -326,6 +326,33 @@
     animation: exp-shimmer 2.4s ease-in-out infinite;
 }
 
+/* Composition bars and gauges grow from their origin so a chart reads
+   left-to-right as it appears instead of popping into place. */
+@keyframes exp-grow-x {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
+}
+
+@keyframes exp-sweep {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.exp-grow-x {
+    transform-origin: left center;
+    animation: exp-grow-x 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.exp-sweep {
+    transform-origin: center;
+    animation: exp-sweep 24s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .exp-rise,
     .exp-fade,
@@ -337,7 +364,9 @@
     .exp-ping-soft,
     .exp-pop,
     .exp-row,
-    .exp-shimmer {
+    .exp-shimmer,
+    .exp-grow-x,
+    .exp-sweep {
         animation: none !important;
     }
 }
