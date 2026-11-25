@@ -3,6 +3,7 @@ import { computed, reactive, ref } from "vue";
 import { Head, router, useForm } from "@inertiajs/vue3";
 import AppLayout from "@/layouts/AppLayout.vue";
 import Heading from "@/components/Heading.vue";
+import AdminTable from "@/components/AdminTable.vue";
 import DentistNav from "@/components/DentistNav.vue";
 import { formatClock } from "@/lib/live-operations";
 import {
@@ -57,7 +58,14 @@ type UnmatchedRow = {
 const props = defineProps<{
     dentists: DentistRow[];
     summary: Record<string, number>;
-    unmatched: UnmatchedRow[];
+    unmatched: {
+        data: UnmatchedRow[];
+        prev_page_url: string | null;
+        next_page_url: string | null;
+        current_page: number;
+        last_page: number;
+        total: number;
+    };
     activityWindow: { from: string; to: string; days: number };
     asOf: string;
     filters: { q: string; state: string; status: string };
@@ -377,39 +385,40 @@ function primaryNumber(row: DentistRow): DirectoryNumber | null {
             </section>
 
             <section class="space-y-3">
-                <h2 class="font-semibold">Unknown mobile destinations ({{ unmatched.length }})</h2>
+                <h2 class="font-semibold">Unknown mobile destinations ({{ unmatched.total }})</h2>
                 <p class="text-xs text-slate-500">
                     Dialled numbers that do not match an approved or pending directory number over the last
                     {{ activityWindow.days }} day(s). Numbers stay masked here; add them to the directory so future
                     transfers can be attributed.
                 </p>
-                <div class="overflow-x-auto rounded-xl border bg-white dark:bg-slate-900">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800">
-                            <tr>
-                                <th class="px-4 py-3">Destination</th>
-                                <th class="px-4 py-3">Reason</th>
-                                <th class="px-4 py-3">Attempts</th>
-                                <th class="px-4 py-3">Last seen</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="row in unmatched" :key="row.display" class="border-t">
-                                <td class="px-4 py-3 font-mono">{{ row.display }}</td>
-                                <td class="px-4 py-3">
-                                    {{ row.reason === "unknown_number" ? "Number not in directory" : "Unparseable channel" }}
-                                </td>
-                                <td class="px-4 py-3">{{ row.attempts }}</td>
-                                <td class="px-4 py-3">{{ formatClock(row.last_seen_at) }}</td>
-                            </tr>
-                            <tr v-if="unmatched.length === 0">
-                                <td colspan="4" class="px-4 py-8 text-center text-slate-500">
-                                    Every recent mobile destination matches the directory.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <AdminTable
+                    :rows="unmatched.data"
+                    :columns="[
+                        { key: 'display', label: 'Destination' },
+                        { key: 'reason', label: 'Reason' },
+                        { key: 'attempts', label: 'Attempts' },
+                        { key: 'last_seen_at', label: 'Last seen' },
+                    ]"
+                    :previous="unmatched.prev_page_url"
+                    :next="unmatched.next_page_url"
+                    row-noun="destination"
+                    empty-title="No unknown destinations"
+                    empty-description="Every recent mobile destination matches the directory."
+                >
+                    <template #cell-display="{ row }">
+                        <span class="font-mono">{{ (row as UnmatchedRow).display }}</span>
+                    </template>
+                    <template #cell-reason="{ row }">
+                        {{
+                            (row as UnmatchedRow).reason === "unknown_number"
+                                ? "Number not in directory"
+                                : "Unparseable channel"
+                        }}
+                    </template>
+                    <template #cell-last_seen_at="{ row }">
+                        {{ formatClock((row as UnmatchedRow).last_seen_at) }}
+                    </template>
+                </AdminTable>
             </section>
         </div>
     </div>

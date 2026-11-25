@@ -16,6 +16,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,9 @@ use Inertia\Response;
 
 class DentistController extends Controller
 {
+    /** Unmatched destinations are derived per request, so they page in fixed-size slices. */
+    private const UNMATCHED_PER_PAGE = 10;
+
     public function index(Request $request, DentistDirectory $directory): Response
     {
         $this->authorize('view dentists');
@@ -57,7 +61,7 @@ class DentistController extends Controller
         return Inertia::render('Dentists/Index', [
             'dentists' => $dentists,
             'summary' => $coverage['summary'],
-            'unmatched' => $coverage['unmatched'],
+            'unmatched' => $this->paginateUnmatched($coverage['unmatched'], $request),
             'activityWindow' => $coverage['activity_window'],
             'asOf' => $coverage['as_of'],
             'filters' => [
@@ -98,7 +102,7 @@ class DentistController extends Controller
                 ))
                 ->orderBy('number')->paginate(25)->withQueryString(),
             'dentists' => Dentist::query()->orderBy('name')->get(['id', 'name']),
-            'unmatched' => $activity['unmatched'],
+            'unmatched' => $this->paginateUnmatched($activity['unmatched'], $request),
             'activityWindow' => $activity['window'],
             'counts' => [
                 'approved' => DentistNumber::query()->where('status', 'approved')->count(),
@@ -656,6 +660,29 @@ class DentistController extends Controller
         $dentist->numbers()
             ->when($ignore !== null, fn ($query) => $query->whereKeyNot($ignore->id))
             ->update(['is_primary' => false]);
+    }
+
+    /**
+     * Page the derived unmatched destinations without disturbing the directory tables.
+     *
+     * The rows come from recent mobile legs rather than an Eloquent query, so they
+     * carry their own `unmatched_page` parameter; the numbers table keeps `page`.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
+    private function paginateUnmatched(array $rows, Request $request): LengthAwarePaginator
+    {
+        $pageName = 'unmatched_page';
+        $page = max(1, $request->integer($pageName, 1));
+
+        return (new LengthAwarePaginator(
+            array_slice($rows, ($page - 1) * self::UNMATCHED_PER_PAGE, self::UNMATCHED_PER_PAGE),
+            count($rows),
+            self::UNMATCHED_PER_PAGE,
+            $page,
+            ['path' => $request->url(), 'pageName' => $pageName],
+        ))->withQueryString();
     }
 
     private function user(Request $request): User

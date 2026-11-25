@@ -228,7 +228,10 @@ test('unknown mobile destinations are flagged while directory numbers match', fu
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Dentists/Numbers')
-            ->where('unmatched', function ($unmatched): bool {
+            ->where('unmatched.total', 1)
+            ->where('unmatched.current_page', 1)
+            ->where('unmatched.last_page', 1)
+            ->where('unmatched.data', function ($unmatched): bool {
                 return count($unmatched) === 1
                     && $unmatched[0]['reason'] === 'unknown_number'
                     && $unmatched[0]['number'] === '+233249999999'
@@ -237,7 +240,40 @@ test('unknown mobile destinations are flagged while directory numbers match', fu
             }));
 
     $this->get(route('dentists.index'))
-        ->assertInertia(fn (AssertableInertia $page) => $page->where('summary.unmatched', 1));
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('summary.unmatched', 1)
+            ->where('unmatched.total', 1)
+            ->has('unmatched.data', 1));
+});
+
+test('unknown mobile destinations page independently of the numbers table', function () {
+    $connection = expDentistConnection();
+
+    foreach (range(1, 11) as $suffix) {
+        $digits = str_pad((string) $suffix, 2, '0', STR_PAD_LEFT);
+        expDentistLeg($connection, 'PJSIP/trunk/02499999'.$digits.'-000000'.$digits);
+    }
+
+    $this->actingAs(expDentistUser());
+
+    $this->get(route('dentists.numbers'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dentists/Numbers')
+            ->where('unmatched.total', 11)
+            ->where('unmatched.current_page', 1)
+            ->where('unmatched.last_page', 2)
+            ->has('unmatched.data', 10)
+            ->where('unmatched.next_page_url', fn (?string $url): bool => is_string($url) && str_contains($url, 'unmatched_page=2'))
+            ->where('unmatched.prev_page_url', null));
+
+    $this->get(route('dentists.numbers', ['unmatched_page' => 2]))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('unmatched.current_page', 2)
+            ->has('unmatched.data', 1)
+            ->where('unmatched.next_page_url', null)
+            ->where('unmatched.prev_page_url', fn (?string $url): bool => is_string($url) && str_contains($url, 'unmatched_page=1')));
 });
 
 test('performance rolls up matched answer outcomes only', function () {

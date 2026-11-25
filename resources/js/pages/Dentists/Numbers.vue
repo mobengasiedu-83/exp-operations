@@ -45,7 +45,14 @@ const props = defineProps<{
         total: number;
     };
     dentists: { id: number; name: string }[];
-    unmatched: UnmatchedRow[];
+    unmatched: {
+        data: UnmatchedRow[];
+        prev_page_url: string | null;
+        next_page_url: string | null;
+        current_page: number;
+        last_page: number;
+        total: number;
+    };
     activityWindow: { from: string; to: string; days: number };
     counts: { approved: number; pending: number; retired: number };
     filters: { status: string; dentist_id: string; q: string };
@@ -251,19 +258,24 @@ function retire(row: NumberRow) {
             </AdminTable>
 
             <section class="space-y-3">
-                <h2 class="font-semibold">Unknown mobile destinations ({{ unmatched.length }})</h2>
+                <h2 class="font-semibold">Unknown mobile destinations ({{ unmatched.total }})</h2>
                 <p class="text-xs text-slate-500">
                     Dialled numbers without a directory match over the last {{ activityWindow.days }} day(s). Add the
                     number above so future transfers attribute to the right dentist. Destinations stay masked here.
                 </p>
                 <AdminTable
-                    :rows="unmatched"
+                    :rows="unmatched.data"
                     :columns="[
                         { key: 'display', label: 'Destination' },
                         { key: 'reason', label: 'Reason' },
                         { key: 'attempts', label: 'Attempts' },
                         { key: 'last_seen_at', label: 'Last seen' },
                     ]"
+                    :previous="unmatched.prev_page_url"
+                    :next="unmatched.next_page_url"
+                    row-noun="destination"
+                    empty-title="No unknown destinations"
+                    empty-description="Every recent mobile destination matches the directory."
                 />
                 <p class="text-xs text-slate-500">Checked at {{ formatClock(activityWindow.to) }}.</p>
             </section>
